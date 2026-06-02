@@ -1,350 +1,42 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lista de Presentes Virtual</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <style>
-        body {
-            background-size: cover !important;
-            background-position: center center !important;
-            background-attachment: fixed !important;
-            background-repeat: no-repeat !important;
-            transition: background-image 0.3s ease;
-        }
-        .card-item {
-            background-size: cover !important;
-            background-position: center center !important;
-            background-repeat: no-repeat !important;
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s ease;
-        }
-        .card-item.reservado {
-            opacity: 0.65;
-            filter: grayscale(40%);
-        }
-        .card-item.reservado::after {
-            content: "RESERVADO";
-            position: absolute;
-            top: 15px;
-            right: -30px;
-            background-color: #dc2626;
-            color: white;
-            font-weight: bold;
-            font-size: 12px;
-            padding: 3px 30px;
-            transform: rotate(45deg);
-            z-index: 10;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-        .card-overlay {
-            background-color: rgba(255, 255, 255, 0.85);
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1;
-        }
-        .card-content {
-            position: relative;
-            z-index: 2;
-        }
-        .icon-img {
-            width: 60px;
-            height: 60px;
-            object-fit: contain;
-            border-radius: 8px;
-        }
-        .btn-google {
-            background-color: #ffffff;
-            color: #333333;
-            border: 1px solid #ddd;
-        }
-        .btn-google:hover {
-            background-color: #f8f8f8;
-        }
-    </style>
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+import { getDatabase } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+import { getAuth, GoogleAuthProvider, signInWithEmailAndPassword, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
 
-    <script type="module" src="./firebase.js"></script>
-    <script type="module" src="./app.js"></script>
-</head>
-<body id="pagina-principal" class="bg-gray-50 font-sans min-h-screen flex flex-col justify-between">
+const firebaseConfig = {
+  apiKey: "AIzaSyC7QQJ_c5wmd3GffLYDrQ3xG44LdXSApFg",
+  authDomain: "lista-de-presentes-33c7f.firebaseapp.com",
+  databaseURL: "https://lista-de-presentes-33c7f-default-rtdb.firebaseio.com",
+  projectId: "lista-de-presentes-33c7f",
+  storageBucket: "lista-de-presentes-33c7f.firebasestorage.app",
+  messagingSenderId: "540439045540",
+  appId: "1:540439045540:web:23587a2640c46784ab0d31"
+};
 
-    <!-- Tela de Login do Usuário -->
-    <div id="screen-login" class="flex-grow flex items-center justify-center p-4">
-        <div class="bg-white/90 p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
-            <div class="text-center mb-8">
-                <span class="text-4xl">🎁</span>
-                <h1 id="login-title" class="text-2xl font-bold text-gray-800 mt-2"></h1>
-                <p id="login-subtitle" class="text-gray-500 text-sm mt-1"></p>
-            </div>
-            <form onsubmit="handleLogin(event)">
-                <div class="mb-5">
-                    <label class="block text-gray-700 text-sm font-semibold mb-2" for="username">Seu Nome</label>
-                    <input class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-pink-500 transition" type="text" id="username" placeholder="Digite seu nome completo" required>
-                </div>
-                <button type="submit" class="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 px-4 rounded-lg transition duration-200 transform active:scale-95 shadow-md">
-                    Entrar na Lista
-                </button>
-            </form>
-            <div class="mt-4 text-center">
-                <button type="button" onclick="showAdminLogin()" class="text-sm text-gray-500 hover:text-pink-500 underline">
-                    Acesso Administrativo
-                </button>
-            </div>
-        </div>
-    </div>
 
-    <!-- Tela de Login do Administrador -->
-    <div id="screen-admin-login" class="hidden flex-grow flex items-center justify-center p-4">
-        <div class="bg-white/90 p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
-            <div class="text-center mb-8">
-                <span class="text-4xl">🔐</span>
-                <h1 class="text-2xl font-bold text-gray-800 mt-2">Área Administrativa</h1>
-                <p class="text-gray-500 text-sm mt-1">Acesso exclusivo para gerenciamento</p>
-            </div>
+// Inicializa o Firebase
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
+const providerGoogle = new GoogleAuthProvider();
 
-            <button type="button" onclick="loginComGoogle()" class="btn-google w-full font-bold py-3 px-4 rounded-lg transition duration-200 transform active:scale-95 shadow-md mb-4 flex items-center justify-center gap-2">
-                <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 14.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.14-10.36 7.14-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></path></svg>
-                Entrar com Google
-            </button>
+export { 
+  db, 
+  auth, 
+  providerGoogle, 
+  getDatabase,
+  getAuth,
+  signInWithEmailAndPassword, 
+  signInWithPopup, 
+  signOut, 
+  onAuthStateChanged,
+  ref, 
+  onValue, 
+  set, 
+  update, 
+  push, 
+  remove, 
+  get 
+};
 
-            <div class="relative my-6">
-                <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-300"></div></div>
-                <div class="relative flex justify-center text-sm"><span class="px-2 bg-white text-gray-500">Ou use e-mail/senha</span></div>
-            </div>
-
-            <form onsubmit="handleAdminLogin(event)">
-                <div class="mb-3">
-                    <label class="block text-gray-700 text-sm font-semibold mb-2" for="admin-email">E-mail</label>
-                    <input class="w-full px-4 py-3 rounded-lg border border-gray-300" type="email" id="admin-email" placeholder="seuemail@dominio.com" required>
-                </div>
-                <div class="mb-5">
-                    <label class="block text-gray-700 text-sm font-semibold mb-2" for="admin-password">Senha</label>
-                    <input class="w-full px-4 py-3 rounded-lg border border-gray-300" type="password" id="admin-password" placeholder="Sua senha de acesso" required>
-                </div>
-                <button type="submit" class="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 px-4 rounded-lg transition duration-200 transform active:scale-95 shadow-md">
-                    Entrar com E-mail
-                </button>
-            </form>
-            <div class="mt-4 text-center">
-                <button type="button" onclick="hideAdminLogin()" class="text-sm text-gray-500 hover:text-pink-500 underline">
-                    Voltar
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Tela Principal / Lista de Presentes -->
-    <div id="screen-dashboard" class="hidden flex-grow container mx-auto px-4 py-8 max-w-5xl">
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between border-b border-gray-200 pb-6 mb-8 bg-white/80 p-4 rounded-xl">
-            <div>
-                <h1 id="main-title" class="text-3xl font-bold text-gray-800">Presentes</h1>
-                <p id="welcomeText" class="text-gray-600 mt-1"></p>
-            </div>
-            <div class="flex flex-wrap gap-2">
-                <button id="btn-lista-compras" onclick="abrirListaCompras()" class="hidden bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold py-2 px-4 rounded-lg transition">
-                    🛒 Lista de Compras
-                </button>
-                <button id="btn-logs" onclick="abrirLogs()" class="hidden bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold py-2 px-4 rounded-lg transition">
-                    📋 Logs
-                </button>
-                <button id="btn-settings" onclick="openSettingsModal()" class="hidden bg-purple-500 hover:bg-purple-600 text-white text-sm font-semibold py-2 px-4 rounded-lg transition">
-                    ⚙️ Configurações
-                </button>
-                <button id="btn-new-item" onclick="openNewItemModal()" class="hidden bg-green-500 hover:bg-green-600 text-white text-sm font-semibold py-2 px-4 rounded-lg transition">
-                    + Novo Item
-                </button>
-                <button type="button" onclick="handleLogout()" class="text-sm text-gray-500 hover:text-red-500 underline transition">
-                    Sair
-                </button>
-            </div>
-        </div>
-
-        <div id="gifts-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            <p class="text-center text-gray-500 col-span-full bg-white/80 p-4 rounded-xl">Carregando lista...</p>
-        </div>
-    </div>
-
-    <!-- MODAL RESERVAR ITEM -->
-    <div id="reserva-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md relative">
-            <button type="button" onclick="closeModal('reserva-modal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl">&times;</button>
-            
-            <h3 class="text-xl font-bold text-gray-800 mb-2">Reservar Presente</h3>
-            <p class="text-gray-600 text-sm mb-4">Você está escolhendo: <strong id="reserva-nome-item"></strong></p>
-
-            <form onsubmit="confirmarReserva(event)">
-                <input type="hidden" id="reserva-id">
-                
-                <div class="mb-3">
-                    <label class="block text-gray-700 text-sm font-semibold mb-1">Seu Nome</label>
-                    <input type="text" id="reserva-nome" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100" readonly>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-semibold mb-1">Deixe uma mensagem (opcional)</label>
-                    <textarea id="reserva-mensagem" class="w-full px-3 py-2 border border-gray-300 rounded-lg" rows="3" placeholder="Ex: Com carinho!"></textarea>
-                </div>
-
-                <button type="submit" class="w-full bg-pink-500 hover:bg-pink-600 text-white font-semibold py-2 px-4 rounded-lg">
-                    Confirmar Reserva e Gerar PIX
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal PIX -->
-    <div id="pix-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center relative border border-gray-100">
-            <button type="button" onclick="closeModal('pix-modal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
-            
-            <h3 class="text-xl font-bold text-gray-800 mb-1" id="modal-gift-name">Nome do Presente</h3>
-            <p class="text-pink-600 font-bold text-lg mb-4" id="modal-gift-value">R$ 0,00</p>
-            
-            <div class="bg-gray-100 p-4 rounded-xl inline-block mb-4">
-                <img id="modal-qr-code" src="" alt="QR Code PIX" class="w-40 h-40 mx-auto">
-            </div>
-            
-            <p class="text-xs text-gray-500 mb-2 px-4">Presenteado por: <strong id="modal-reservado-por"></strong></p>
-            <p class="text-xs italic text-gray-500 mb-4 px-4" id="modal-mensagem-recado"></p>
-            
-            <div class="bg-gray-50 border border-gray-200 rounded-lg p-2 flex items-center justify-between text-left mb-4">
-                <span class="text-xs text-gray-600 truncate mr-2" id="pix-copia-cola">chave-pix-ficticia-copia-e-cola...</span>
-                <button type="button" onclick="copyPixKey()" class="bg-pink-500 text-white text-xs font-semibold px-3 py-1.5 rounded hover:bg-pink-600 transition shrink-0">Copiar</button>
-            </div>
-            
-            <!-- Botões de Ação -->
-            <div id="botoes-acao-pix" class="flex flex-col gap-2 mt-2 mb-2">
-                <button type="button" onclick="confirmarCompra()" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition text-sm">
-                    ✅ Confirmar Compra
-                </button>
-                <button type="button" onclick="cancelarReserva()" class="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition text-sm">
-                    ❌ Cancelar Reserva
-                </button>
-            </div>
-
-            <button type="button" onclick="closeModal('pix-modal')" class="w-full bg-gray-800 hover:bg-gray-900 text-white font-semibold py-2 px-4 rounded-lg transition mt-2">
-                Fechar
-            </button>
-        </div>
-    </div>
-
-    <!-- Modal Edição / Novo Item -->
-    <div id="edit-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md relative border border-gray-100">
-            <button type="button" onclick="closeModal('edit-modal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
-            
-            <h3 class="text-xl font-bold text-gray-800 mb-4" id="edit-modal-title">Adicionar Novo Presente</h3>
-            
-            <form onsubmit="saveItem(event)">
-                <input type="hidden" id="edit-id">
-                
-                <div class="mb-3">
-                    <label class="block text-gray-700 text-sm font-semibold mb-1">Nome</label>
-                    <input type="text" id="edit-name" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required>
-                </div>
-                <div class="mb-3">
-                    <label class="block text-gray-700 text-sm font-semibold mb-1">Valor (ex: R$ 100,00)</label>
-                    <input type="text" id="edit-price" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required>
-                </div>
-                <div class="mb-3">
-                    <label class="block text-gray-700 text-sm font-semibold mb-1">URL da Imagem do Ícone</label>
-                    <input type="text" id="edit-icon" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="https://exemplo.com/icone.png" required>
-                </div>
-                <div class="mb-3">
-                    <label class="block text-gray-700 text-sm font-semibold mb-1">URL Imagem de Fundo do Item (opcional)</label>
-                    <input type="text" id="edit-imagem" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="https://exemplo.com/fundo.jpg">
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-semibold mb-1">Chave PIX</label>
-                    <textarea id="edit-pixkey" class="w-full px-3 py-2 border border-gray-300 rounded-lg" rows="3" required></textarea>
-                </div>
-
-                <div class="flex gap-2">
-                    <button type="submit" class="w-full bg-pink-500 hover:bg-pink-600 text-white font-semibold py-2 px-4 rounded-lg transition">
-                        Salvar
-                    </button>
-                    <button type="button" id="btn-delete" onclick="deleteItem()" class="hidden w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition">
-                        Excluir
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal CONFIGURAÇÕES -->
-    <div id="settings-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md relative border border-gray-100">
-            <button type="button" onclick="closeModal('settings-modal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
-            
-            <h3 class="text-xl font-bold text-gray-800 mb-4">⚙️ Configurações do Sistema</h3>
-            
-            <form onsubmit="saveSettings(event)">
-                <div class="mb-3">
-                    <label class="block text-gray-700 text-sm font-semibold mb-1">Título da Tela Inicial</label>
-                    <input type="text" id="cfg-login-title" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                </div>
-                <div class="mb-3">
-                    <label class="block text-gray-700 text-sm font-semibold mb-1">Subtítulo da Tela Inicial</label>
-                    <input type="text" id="cfg-login-subtitle" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                </div>
-                <div class="mb-3">
-                    <label class="block text-gray-700 text-sm font-semibold mb-1">Título Principal (Topo)</label>
-                    <input type="text" id="cfg-main-title" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                </div>
-                <div class="mb-3">
-                    <label class="block text-gray-700 text-sm font-semibold mb-1">Texto de Saudação</label>
-                    <input type="text" id="cfg-welcome-text" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Ex: Olá, [NOME]! Escolha seu presente...">
-                </div>
-                <div class="mb-3">
-                    <label class="block text-gray-700 text-sm font-semibold mb-1">URL Imagem de Fundo do Site</label>
-                    <input type="text" id="cfg-bg-image" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="https://exemplo.com/fundo.jpg">
-                </div>
-                <div class="mb-3">
-                    <label class="block text-gray-700 text-sm font-semibold mb-1">Texto do Rodapé</label>
-                    <input type="text" id="cfg-footer-text" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                </div>
-
-                <button type="submit" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg transition">
-                    Salvar Alterações
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL LISTA DE COMPRAS -->
-    <div id="lista-compras-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-2xl relative max-h-[80vh] overflow-y-auto">
-            <button type="button" onclick="closeModal('lista-compras-modal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl">&times;</button>
-            
-            <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">🛒 Lista de Compras e Mensagens</h3>
-            
-            <div id="lista-compras-conteudo" class="space-y-3">
-                <p class="text-gray-500 text-center">Nenhum item reservado ainda.</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL LOGS DE ALTERAÇÕES -->
-    <div id="logs-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-2xl relative max-h-[80vh] overflow-y-auto">
-            <button type="button" onclick="closeModal('logs-modal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl">&times;</button>
-            
-            <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">📋 Histórico de Alterações</h3>
-            
-            <div id="logs-conteudo" class="space-y-2 text-sm">
-                <p class="text-gray-500 text-center">Nenhuma alteração registrada.</p>
-            </div>
-        </div>
-    </div>
-
-    <footer id="rodape" class="text-center py-4 text-xs text-gray-400 border-t border-gray-100 bg-white/80 w-full">
-        <span id="footer-text">Lista de Presentes &copy; 2026</span>
-    </footer>
-
-</body>
-</html>
+// Importações adicionais necessárias
+import { ref, onValue, set, update, push, remove, get } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
