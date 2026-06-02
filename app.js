@@ -91,7 +91,7 @@ window.handleAdminLogin = async function(event) {
         screenDashboard.classList.remove('hidden');
         mostrarBotoesAdmin();
         atualizarSaudacao();
-        renderGifts();
+        renderGifts(); // ✅ FORÇA A ATUALIZAÇÃO DOS ITENS AO LOGAR
         alert("✅ Logado como Administrador!");
     } catch (erro) {
         console.error("ERRO LOGIN EMAIL:", erro);
@@ -109,7 +109,7 @@ window.loginComGoogle = async function() {
         screenDashboard.classList.remove('hidden');
         mostrarBotoesAdmin();
         atualizarSaudacao();
-        renderGifts();
+        renderGifts(); // ✅ FORÇA A ATUALIZAÇÃO DOS ITENS AO LOGAR
         alert("✅ Logado com Google como Administrador!");
     } catch (erro) {
         console.error("ERRO GOOGLE:", erro);
@@ -240,7 +240,9 @@ window.confirmarCompra = async function() {
 
     try {
         const itemRef = ref(db, `gifts/${itemAtualId}`);
-        await update(itemRef, { status: 'pago' });
+        await update(itemRef, {
+            status: 'pago'
+        });
         registrarLog("VENDA", `Compra confirmada para o item ID: ${itemAtualId}`);
         alert("✅ Compra confirmada com sucesso!");
         closeModal('pix-modal');
@@ -465,7 +467,7 @@ document.addEventListener("DOMContentLoaded", () => {
         snapshot.forEach((childSnapshot) => {
             giftsData.push({ id: childSnapshot.key, ...childSnapshot.val() });
         });
-        renderGifts();
+        renderGifts(); // ✅ Agora renderiza sempre que os dados mudam, independente de onde estiver
     });
 });
 
@@ -509,4 +511,37 @@ function renderGifts() {
 
     giftsData.forEach(gift => {
         const card = document.createElement('div');
-        card.className = `card-item bg-white rounded-xl shadow-md p-6 border
+        card.className = `card-item bg-white rounded-xl shadow-md p-6 border border-gray-100 flex flex-col justify-between hover:shadow-lg transition duration-200 relative ${gift.reservadoPor ? 'reservado' : ''}`;
+        
+        if(gift.imagem && gift.imagem !== "") {
+            const imgTest = new Image();
+            imgTest.onload = () => card.style.backgroundImage = `url("${gift.imagem}")`;
+            imgTest.onerror = () => card.style.backgroundImage = "";
+            imgTest.src = gift.imagem;
+        }
+
+        // ✅ CORREÇÃO PRINCIPAL: O lápis aparece SEMPRE se for admin, direto no HTML
+        const adminEditButton = isAdmin ? `
+            <button onclick="openEditModal('${gift.id}')" class="absolute top-2 right-2 z-10 text-gray-700 hover:text-pink-600 bg-white/80 p-1.5 rounded-full text-lg transition-transform hover:scale-110" title="Editar Item">✏️</button>
+        ` : '';
+
+        const botaoAcao = gift.reservadoPor 
+            ? `<button onclick="openPixModal('${gift.id}')" class="w-full bg-gray-500/90 text-white text-sm font-semibold py-2.5 px-4 rounded-lg">Ver Recado / PIX</button>`
+            : `<button onclick="abrirReserva('${gift.id}', '${gift.name.replace(/'/g, "\\'")}')" class="w-full bg-pink-500/90 hover:bg-pink-600 text-white text-sm font-semibold py-2.5 px-4 rounded-lg transition duration-150">Escolher este</button>`;
+
+        card.innerHTML = `
+            <div class="card-overlay"></div>
+            ${adminEditButton} 
+            <div class="card-content">
+                <div class="text-4xl mb-4 bg-pink-50/80 inline-block p-3 rounded-xl flex items-center justify-center">
+                    <img src="${gift.icon}" alt="Ícone" class="icon-img" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3099/3099358.png'">
+                </div>
+                <h2 class="text-lg font-bold text-gray-800 mb-1">${gift.name}</h2>
+                <p class="text-gray-600 text-sm mb-4">Valor estimado</p>
+                <p class="text-xl font-extrabold text-pink-600 mb-4">${gift.price}</p>
+                ${botaoAcao}
+            </div>
+        `;
+        giftsGrid.appendChild(card);
+    });
+}
