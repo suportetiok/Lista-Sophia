@@ -91,7 +91,7 @@ window.handleAdminLogin = async function(event) {
         screenDashboard.classList.remove('hidden');
         mostrarBotoesAdmin();
         atualizarSaudacao();
-        renderGifts(); // ✅ FORÇA A ATUALIZAÇÃO DOS ITENS AO LOGAR
+        renderGifts();
         alert("✅ Logado como Administrador!");
     } catch (erro) {
         console.error("ERRO LOGIN EMAIL:", erro);
@@ -109,7 +109,7 @@ window.loginComGoogle = async function() {
         screenDashboard.classList.remove('hidden');
         mostrarBotoesAdmin();
         atualizarSaudacao();
-        renderGifts(); // ✅ FORÇA A ATUALIZAÇÃO DOS ITENS AO LOGAR
+        renderGifts();
         alert("✅ Logado com Google como Administrador!");
     } catch (erro) {
         console.error("ERRO GOOGLE:", erro);
@@ -240,9 +240,7 @@ window.confirmarCompra = async function() {
 
     try {
         const itemRef = ref(db, `gifts/${itemAtualId}`);
-        await update(itemRef, {
-            status: 'pago'
-        });
+        await update(itemRef, { status: 'pago' });
         registrarLog("VENDA", `Compra confirmada para o item ID: ${itemAtualId}`);
         alert("✅ Compra confirmada com sucesso!");
         closeModal('pix-modal');
@@ -288,11 +286,13 @@ window.reativarItem = async function(giftId) {
     }
 };
 
+// ✅ FUNÇÃO ATUALIZADA: Agora o nome do comprador aparece em destaque
 window.abrirListaCompras = async function() {
     if(!isAdmin) { alert("❌ Acesso restrito!"); return; }
     const conteudo = document.getElementById('lista-compras-conteudo');
     conteudo.innerHTML = '';
 
+    // Filtra apenas os itens que tem comprador/reserva
     const itensReservados = giftsData.filter(g => g.reservadoPor);
     
     if(itensReservados.length === 0) {
@@ -300,14 +300,23 @@ window.abrirListaCompras = async function() {
     } else {
         itensReservados.forEach(item => {
             const div = document.createElement('div');
-            div.className = 'p-3 border border-gray-200 rounded-lg bg-white shadow-sm';
+            div.className = 'p-4 border border-gray-200 rounded-lg bg-white shadow-sm hover:shadow-md transition';
             div.innerHTML = `
-                <p class="font-bold text-pink-700">${item.name} - ${item.price}</p>
-                <p class="text-sm"><strong>Presenteado por:</strong> ${item.reservadoPor}</p>
-                <p class="text-sm italic text-gray-600">Recado: ${item.mensagem || '---'}</p>
-                <p class="text-xs font-bold ${item.status === 'pago' ? 'text-green-600' : 'text-orange-500'}">Status: ${item.status === 'pago' ? 'PAGO' : 'RESERVADO'}</p>
-                <button onclick="reativarItem('${item.id}')" class="mt-2 text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded">
-                    🔄 Reativar Item
+                <p class="text-sm text-gray-500 mb-1">Item:</p>
+                <p class="font-bold text-lg text-pink-700 mb-2">${item.name} - ${item.price}</p>
+                
+                <p class="text-sm text-gray-500 mb-1">Comprador / Reservado por:</p>
+                <p class="font-bold text-md text-blue-700 bg-blue-50 p-2 rounded mb-2">👤 ${item.reservadoPor}</p>
+                
+                <p class="text-sm text-gray-500 mb-1">Recado:</p>
+                <p class="text-sm italic text-gray-600 bg-gray-50 p-2 rounded mb-2">${item.mensagem || '---'}</p>
+                
+                <p class="text-xs font-bold mb-2 ${item.status === 'pago' ? 'text-green-600' : 'text-orange-500'}">
+                    Status: ${item.status === 'pago' ? '✅ PAGO' : '⏳ RESERVADO / AGUARDANDO PAGAMENTO'}
+                </p>
+                
+                <button onclick="reativarItem('${item.id}')" class="w-full text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-2 rounded transition">
+                    🔄 Reativar Item (Liberar para outro)
                 </button>
             `;
             conteudo.appendChild(div);
@@ -467,7 +476,7 @@ document.addEventListener("DOMContentLoaded", () => {
         snapshot.forEach((childSnapshot) => {
             giftsData.push({ id: childSnapshot.key, ...childSnapshot.val() });
         });
-        renderGifts(); // ✅ Agora renderiza sempre que os dados mudam, independente de onde estiver
+        renderGifts();
     });
 });
 
@@ -520,28 +529,11 @@ function renderGifts() {
             imgTest.src = gift.imagem;
         }
 
-        // ✅ CORREÇÃO PRINCIPAL: O lápis aparece SEMPRE se for admin, direto no HTML
+        // Botão de Editar (lápis) aparece sempre para Admin
         const adminEditButton = isAdmin ? `
             <button onclick="openEditModal('${gift.id}')" class="absolute top-2 right-2 z-10 text-gray-700 hover:text-pink-600 bg-white/80 p-1.5 rounded-full text-lg transition-transform hover:scale-110" title="Editar Item">✏️</button>
         ` : '';
 
         const botaoAcao = gift.reservadoPor 
             ? `<button onclick="openPixModal('${gift.id}')" class="w-full bg-gray-500/90 text-white text-sm font-semibold py-2.5 px-4 rounded-lg">Ver Recado / PIX</button>`
-            : `<button onclick="abrirReserva('${gift.id}', '${gift.name.replace(/'/g, "\\'")}')" class="w-full bg-pink-500/90 hover:bg-pink-600 text-white text-sm font-semibold py-2.5 px-4 rounded-lg transition duration-150">Escolher este</button>`;
-
-        card.innerHTML = `
-            <div class="card-overlay"></div>
-            ${adminEditButton} 
-            <div class="card-content">
-                <div class="text-4xl mb-4 bg-pink-50/80 inline-block p-3 rounded-xl flex items-center justify-center">
-                    <img src="${gift.icon}" alt="Ícone" class="icon-img" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3099/3099358.png'">
-                </div>
-                <h2 class="text-lg font-bold text-gray-800 mb-1">${gift.name}</h2>
-                <p class="text-gray-600 text-sm mb-4">Valor estimado</p>
-                <p class="text-xl font-extrabold text-pink-600 mb-4">${gift.price}</p>
-                ${botaoAcao}
-            </div>
-        `;
-        giftsGrid.appendChild(card);
-    });
-}
+            : `<button onclick="abrirReserva('${gift.id}', '
