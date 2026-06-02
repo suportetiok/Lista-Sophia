@@ -1,4 +1,4 @@
-import { db, auth, providerGoogle, ref, onValue, set, update, push, remove, get } from './firebase.js';
+import { db, auth, providerGoogle, ref, onValue, set, update, push, remove, get, signInWithEmailAndPassword, signInWithPopup, signOut, onAuthStateChanged } from './firebase.js';
 
 // Variáveis Globais
 let isAdmin = false;
@@ -216,9 +216,6 @@ window.confirmarReserva = async function(event) {
     const nomePessoa = reservaNome.value.trim();
     const mensagemPessoa = reservaMensagem.value.trim();
 
-    // Salva estado ANTES da alteração para poder desfazer
-    const itemAntes = giftsData.find(g => g.id === id) || {};
-
     try {
         const itemRef = ref(db, `gifts/${id}`);
         await update(itemRef, {
@@ -227,7 +224,7 @@ window.confirmarReserva = async function(event) {
             status: 'reservado'
         });
 
-        registrarLog("RESERVA", `Item reservado por ${nomePessoa}`, id, itemAntes);
+        registrarLog("RESERVA", `Item reservado por ${nomePessoa}`);
         alert("✅ Reserva confirmada! Agora é só pagar o PIX.");
         closeModal('reserva-modal');
         openPixModal(id);
@@ -241,12 +238,10 @@ window.confirmarCompra = async function() {
     if(!itemAtualId) return;
     if(!confirm("Tem certeza que deseja CONFIRMAR a compra? O item será marcado como pago.")) return;
 
-    const itemAntes = giftsData.find(g => g.id === itemAtualId) || {};
-
     try {
         const itemRef = ref(db, `gifts/${itemAtualId}`);
         await update(itemRef, { status: 'pago' });
-        registrarLog("VENDA", `Compra confirmada`, itemAtualId, itemAntes);
+        registrarLog("VENDA", `Compra confirmada para o item ID: ${itemAtualId}`);
         alert("✅ Compra confirmada com sucesso!");
         closeModal('pix-modal');
     } catch (erro) {
@@ -258,8 +253,6 @@ window.cancelarReserva = async function() {
     if(!itemAtualId) return;
     if(!confirm("Tem certeza que deseja CANCELAR esta reserva? O item voltará a ficar disponível.")) return;
 
-    const itemAntes = giftsData.find(g => g.id === itemAtualId) || {};
-
     try {
         const itemRef = ref(db, `gifts/${itemAtualId}`);
         await update(itemRef, {
@@ -267,7 +260,7 @@ window.cancelarReserva = async function() {
             mensagem: null,
             status: null
         });
-        registrarLog("CANCELAMENTO", `Reserva cancelada. Item disponível.`, itemAtualId, itemAntes);
+        registrarLog("CANCELAMENTO", `Reserva cancelada. Item disponível novamente.`);
         alert("✅ Reserva cancelada! Item liberado.");
         closeModal('pix-modal');
     } catch (erro) {
@@ -279,8 +272,6 @@ window.reativarItem = async function(giftId) {
     if(!isAdmin) { alert("❌ Acesso restrito!"); return; }
     if(!confirm("Deseja reativar este item? Ele aparecerá como disponível na lista.")) return;
 
-    const itemAntes = giftsData.find(g => g.id === giftId) || {};
-
     try {
         const itemRef = ref(db, `gifts/${giftId}`);
         await update(itemRef, {
@@ -288,7 +279,7 @@ window.reativarItem = async function(giftId) {
             mensagem: null,
             status: null
         });
-        registrarLog("REATIVACAO", `Item reativado e disponível`, giftId, itemAntes);
+        registrarLog("REATIVACAO", `Item reativado e disponível para reserva.`);
         alert("✅ Item reativado com sucesso!");
     } catch (erro) {
         alert("❌ Erro: " + erro.message);
@@ -307,23 +298,14 @@ window.abrirListaCompras = async function() {
     } else {
         itensReservados.forEach(item => {
             const div = document.createElement('div');
-            div.className = 'p-4 border border-gray-200 rounded-lg bg-white shadow-sm hover:shadow-md transition';
+            div.className = 'p-3 border border-gray-200 rounded-lg bg-white shadow-sm';
             div.innerHTML = `
-                <p class="text-sm text-gray-500 mb-1">Item:</p>
-                <p class="font-bold text-lg text-pink-700 mb-2">${item.name} - ${item.price}</p>
-                
-                <p class="text-sm text-gray-500 mb-1">Comprador / Reservado por:</p>
-                <p class="font-bold text-md text-blue-700 bg-blue-50 p-2 rounded mb-2">👤 ${item.reservadoPor}</p>
-                
-                <p class="text-sm text-gray-500 mb-1">Recado:</p>
-                <p class="text-sm italic text-gray-600 bg-gray-50 p-2 rounded mb-2">${item.mensagem || '---'}</p>
-                
-                <p class="text-xs font-bold mb-2 ${item.status === 'pago' ? 'text-green-600' : 'text-orange-500'}">
-                    Status: ${item.status === 'pago' ? '✅ PAGO' : '⏳ RESERVADO / AGUARDANDO PAGAMENTO'}
-                </p>
-                
-                <button onclick="reativarItem('${item.id}')" class="w-full text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-2 rounded transition">
-                    🔄 Reativar Item (Liberar para outro)
+                <p class="font-bold text-pink-700">${item.name} - ${item.price}</p>
+                <p class="text-sm"><strong>Presenteado por:</strong> ${item.reservadoPor}</p>
+                <p class="text-sm italic text-gray-600">Recado: ${item.mensagem || '---'}</p>
+                <p class="text-xs font-bold ${item.status === 'pago' ? 'text-green-600' : 'text-orange-500'}">Status: ${item.status === 'pago' ? 'PAGO' : 'RESERVADO'}</p>
+                <button onclick="reativarItem('${item.id}')" class="mt-2 text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded">
+                    🔄 Reativar Item
                 </button>
             `;
             conteudo.appendChild(div);
@@ -332,7 +314,6 @@ window.abrirListaCompras = async function() {
     document.getElementById('lista-compras-modal').classList.remove('hidden');
 };
 
-// ✅ FUNÇÃO ATUALIZADA: Logs com Nome do Usuário e Opção Desfazer
 window.abrirLogs = async function() {
     if(!isAdmin) { alert("❌ Acesso restrito!"); return; }
     const conteudo = document.getElementById('logs-conteudo');
@@ -352,31 +333,11 @@ window.abrirLogs = async function() {
 
             listaLogs.forEach(log => {
                 const div = document.createElement('div');
-                div.className = 'log-item p-3 border-b border-gray-100 rounded-lg flex flex-col md:flex-row md:items-center md:justify-between gap-2';
-                
-                // Define cor do tipo de ação
-                let corTipo = 'text-blue-600';
-                if(log.tipo === 'EXCLUSAO') corTipo = 'text-red-600';
-                if(log.tipo === 'CRIACAO') corTipo = 'text-green-600';
-                if(log.tipo === 'RESERVA') corTipo = 'text-purple-600';
-                if(log.tipo === 'VENDA') corTipo = 'text-green-700';
-                if(log.tipo === 'CANCELAMENTO') corTipo = 'text-orange-600';
-
-                // Botão Desfazer: só aparece se tiver dados para reverter
-                const botaoDesfazer = log.itemId && log.estadoAnterior ? `
-                    <button onclick="desfazerAcao('${log.id}', '${log.itemId}')" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-1 rounded transition shrink-0">
-                        ↩️ Desfazer
-                    </button>
-                ` : '';
-
+                div.className = 'p-2 border-b border-gray-100';
                 div.innerHTML = `
-                    <div>
-                        <span class="text-gray-500 text-xs font-mono">[${log.data} ${log.hora}]</span>
-                        <span class="font-semibold ${corTipo} ml-1">${log.tipo}</span>
-                        <span class="text-gray-700 ml-1">${log.descricao}</span>
-                        <p class="text-xs text-gray-500 mt-1">Alterado por: <strong class="text-gray-800">${log.usuario || 'Desconhecido'}</strong></p>
-                    </div>
-                    ${botaoDesfazer}
+                    <span class="text-gray-500 text-xs">[${log.data} ${log.hora}]</span> 
+                    <span class="font-semibold ${log.tipo === 'EXCLUSAO' ? 'text-red-600' : log.tipo === 'CRIACAO' ? 'text-green-600' : 'text-blue-600'}">${log.tipo}</span>
+                    <span class="text-gray-700">: ${log.descricao}</span>
                 `;
                 conteudo.appendChild(div);
             });
@@ -385,35 +346,6 @@ window.abrirLogs = async function() {
     } catch (erro) {
         conteudo.innerHTML = `<p class="text-red-500 text-center">Erro ao carregar logs: ${erro.message}</p>`;
         document.getElementById('logs-modal').classList.remove('hidden');
-    }
-};
-
-// ✅ NOVA FUNÇÃO: Desfazer ação com base no estado salvo
-window.desfazerAcao = async function(logId, itemId) {
-    if(!confirm("Tem certeza que deseja DESFAZER esta alteração? Isso restaurará o estado anterior do item.")) return;
-
-    try {
-        // Busca os dados completos do log para pegar o estado anterior
-        const logRef = ref(db, `logs/${logId}`);
-        const logSnapshot = await get(logRef);
-        const logData = logSnapshot.val();
-
-        if(!logData || !logData.estadoAnterior) {
-            alert("❌ Não há dados salvos para desfazer esta ação.");
-            return;
-        }
-
-        // Restaura o item ao estado anterior
-        const itemRef = ref(db, `gifts/${itemId}`);
-        await set(itemRef, logData.estadoAnterior);
-
-        // Registra que foi desfeito
-        registrarLog("DESFAZER", `Alteração de ${logData.tipo} desfeita: ${logData.descricao}`, itemId);
-
-        alert("✅ Ação desfeita com sucesso! O item voltou ao estado anterior.");
-
-    } catch (erro) {
-        alert("❌ Erro ao desfazer: " + erro.message);
     }
 };
 
@@ -440,19 +372,16 @@ window.saveItem = async function(event) {
         pixKey: editPixKey.value.trim()
     };
 
-    // Salva estado anterior se for edição
-    const itemAntes = editId.value ? giftsData.find(g => g.id === editId.value) || {} : null;
-
     try {
         if(editId.value) {
             const itemRef = ref(db, `gifts/${editId.value}`);
             await update(itemRef, item);
-            registrarLog("EDIÇÃO", `Item alterado: ${item.name}`, editId.value, itemAntes);
+            registrarLog("EDIÇÃO", `Item alterado: ${item.name}`);
             alert("✅ Item atualizado!");
         } else {
             const giftsRef = ref(db, 'gifts');
             const novoItemRef = await push(giftsRef, item);
-            registrarLog("CRIACAO", `Novo item criado: ${item.name}`, novoItemRef.key);
+            registrarLog("CRIACAO", `Novo item criado: ${item.name}`);
             alert("✅ Novo item adicionado!");
         }
         closeModal('edit-modal');
@@ -466,10 +395,9 @@ window.deleteItem = async function() {
     if(confirm("Tem certeza que deseja excluir? Essa ação não pode ser desfeita!")) {
         try {
             const nomeExcluido = giftsData.find(g => g.id === editId.value)?.name || editId.value;
-            const itemAntes = giftsData.find(g => g.id === editId.value) || {};
             const itemRef = ref(db, `gifts/${editId.value}`);
             await remove(itemRef);
-            registrarLog("EXCLUSAO", `Item excluído: ${nomeExcluido}`, editId.value, itemAntes);
+            registrarLog("EXCLUSAO", `Item excluído: ${nomeExcluido}`);
             alert("✅ Item excluído!");
             closeModal('edit-modal');
         } catch (erro) {
@@ -481,10 +409,6 @@ window.deleteItem = async function() {
 window.saveSettings = async function(event) {
     event.preventDefault();
     if(!isAdmin) { alert("❌ Apenas administradores podem alterar!"); return; }
-    
-    // Salva configurações antigas para possível desfazer
-    const configAntes = {...siteConfig};
-
     try {
         const configRef = ref(db, 'configuracoes');
         const dadosAtualizados = {
@@ -496,7 +420,7 @@ window.saveSettings = async function(event) {
             footerText: cfgFooterText.value
         };
         await update(configRef, dadosAtualizados);
-        registrarLog("CONFIG", `Configurações do sistema alteradas`, null, configAntes);
+        registrarLog("CONFIG", `Configurações do sistema alteradas`);
         closeModal('settings-modal');
         alert("✅ Configurações salvas!");
     } catch (erro) {
@@ -519,4 +443,70 @@ document.addEventListener("DOMContentLoaded", () => {
             footerText.textContent = siteConfig.footerText || "© 2026 Lista de Presentes";
 
             if(siteConfig.backgroundImage && paginaPrincipal) {
-                paginaPrincipal.style.backgroundImage =
+                paginaPrincipal.style.backgroundImage = `url("${siteConfig.backgroundImage}")`;
+            }
+
+            if(usuarioAtualNome !== "") atualizarSaudacao();
+
+        } else {
+            set(configRef, {
+                loginTitle: "Lista de Presentes",
+                loginSubtitle: "Identifique-se para acessar a lista",
+                mainTitle: "Presentes",
+                welcomeText: "Olá, [NOME]! Escolha um item para presentear via PIX.",
+                footerText: "Lista de Presentes &copy; 2026",
+                backgroundImage: ""
+            });
+        }
+    });
+
+    onValue(giftsRef, (snapshot) => {
+        giftsData = [];
+        snapshot.forEach((childSnapshot) => {
+            giftsData.push({ id: childSnapshot.key, ...childSnapshot.val() });
+        });
+        renderGifts();
+    });
+});
+
+
+// FUNÇÕES AUXILIARES
+function atualizarSaudacao(){
+    if(!welcomeText) return;
+    const textoBase = siteConfig.welcomeText || "Olá, [NOME]! Escolha um item para presentear via PIX.";
+    welcomeText.innerHTML = textoBase.replace("[NOME]", `<span class="font-semibold text-pink-600">${usuarioAtualNome}</span>`);
+}
+
+function mostrarBotoesAdmin(){
+    btnNewItem.classList.remove('hidden');
+    btnSettings.classList.remove('hidden');
+    btnListaCompras.classList.remove('hidden');
+    btnLogs.classList.remove('hidden');
+}
+
+function registrarLog(tipo, descricao) {
+    const agora = new Date();
+    const data = agora.toLocaleDateString('pt-BR');
+    const hora = agora.toLocaleTimeString('pt-BR');
+    
+    push(ref(db, 'logs'), {
+        tipo: tipo,
+        descricao: descricao,
+        data: data,
+        hora: hora,
+        usuario: usuarioAtualNome
+    }).catch(e => console.log("Aviso: Log não registrado - ", e.message));
+}
+
+function renderGifts() {
+    if(!giftsGrid) return;
+    giftsGrid.innerHTML = '';
+    
+    if(giftsData.length === 0) {
+        giftsGrid.innerHTML = '<p class="text-center text-gray-500 col-span-full bg-white/80 p-4 rounded-xl">Nenhum presente cadastrado ainda.</p>';
+        return;
+    }
+
+    giftsData.forEach(gift => {
+        const card = document.createElement('div');
+        card.className = `card-item bg-white rounded-xl shadow-md p-6 border
