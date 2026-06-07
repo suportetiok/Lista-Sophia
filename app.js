@@ -37,6 +37,11 @@ const pixCopiaCola = document.getElementById('pix-copia-cola');
 const modalReservadoPor = document.getElementById('modal-reservado-por');
 const modalMensagemRecado = document.getElementById('modal-mensagem-recado');
 const botoesAcaoPix = document.getElementById('botoes-acao-pix');
+// ✅ NOVOS ELEMENTOS PARA EDIÇÃO DA CHAVE PIX
+const btnEditarChavePix = document.getElementById('btn-editar-chave-pix');
+const inputEditarChavePix = document.getElementById('input-editar-chave-pix');
+const btnSalvarChavePix = document.getElementById('btn-salvar-chave-pix');
+const btnCancelarEdicaoPix = document.getElementById('btn-cancelar-edicao-pix');
 
 const reservaModal = document.getElementById('reserva-modal');
 const reservaId = document.getElementById('reserva-id');
@@ -53,17 +58,81 @@ const cfgBgImage = document.getElementById('cfg-bg-image');
 const cfgFooterText = document.getElementById('cfg-footer-text');
 
 
-// FUNÇÕES GLOBAIS
+// ✅ FUNÇÃO FECHAR MODAL ALTERADA: AGORA CANCELA TUDO AO FECHAR
 window.closeModal = function(modalId) {
     const modal = document.getElementById(modalId);
     if(modal) modal.classList.add('hidden');
+
+    // ✅ Se fechar o modal de RESERVA → CANCELA A RESERVA
+    if(modalId === 'reserva-modal' && reservaId.value) {
+        cancelarReservaAoFechar(reservaId.value);
+    }
+
+    // ✅ Se fechar o modal de PIX/COMPRA → CANCELA A COMPRA/RESERVA
+    if(modalId === 'pix-modal' && itemAtualId) {
+        // ✅ Reseta modo de edição da chave ao fechar
+        fecharEdicaoChavePix();
+        cancelarReservaAoFechar(itemAtualId);
+    }
 };
+
+// ✅ NOVA FUNÇÃO: Cancelar automaticamente ao fechar
+async function cancelarReservaAoFechar(idItem) {
+    try {
+        const itemRef = ref(db, `gifts/${idItem}`);
+        await update(itemRef, {
+            reservadoPor: null,
+            mensagem: null,
+            status: null
+        });
+        registrarLog("CANCELAMENTO_AO_FECHAR", `Janela fechada → reserva/compra cancelada, item liberado`, idItem);
+    } catch (erro) {
+        console.log("Aviso ao cancelar por fechar janela:", erro.message);
+    }
+}
 
 window.copyPixKey = function() {
     if (!pixCopiaCola) return;
     navigator.clipboard.writeText(pixCopiaCola.textContent)
         .then(() => alert("✅ Código PIX copiado!"))
         .catch(() => alert("❌ Erro ao copiar, copie manualmente."));
+};
+
+// ✅ FUNÇÕES DE EDIÇÃO DA CHAVE PIX (SÓ ADM)
+window.iniciarEdicaoChavePix = function() {
+    if(!isAdmin) return;
+    pixCopiaCola.classList.add('hidden');
+    btnEditarChavePix.classList.add('hidden');
+    inputEditarChavePix.value = pixCopiaCola.textContent;
+    inputEditarChavePix.classList.remove('hidden');
+    btnSalvarChavePix.classList.remove('hidden');
+    btnCancelarEdicaoPix.classList.remove('hidden');
+};
+
+window.fecharEdicaoChavePix = function() {
+    pixCopiaCola.classList.remove('hidden');
+    btnEditarChavePix.classList.remove('hidden');
+    inputEditarChavePix.classList.add('hidden');
+    btnSalvarChavePix.classList.add('hidden');
+    btnCancelarEdicaoPix.classList.add('hidden');
+};
+
+window.salvarChavePix = async function() {
+    if(!isAdmin || !itemAtualId) return;
+    const novaChave = inputEditarChavePix.value.trim();
+    if(!novaChave) { alert("❌ Chave PIX não pode ficar vazia!"); return; }
+
+    try {
+        const itemRef = ref(db, `gifts/${itemAtualId}`);
+        await update(itemRef, { pixKey: novaChave });
+        pixCopiaCola.textContent = novaChave;
+        modalQrCode.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(novaChave)}`;
+        registrarLog("ALTERACAO_CHAVE_PIX", `Chave PIX alterada diretamente na janela`, itemAtualId);
+        alert("✅ Chave PIX atualizada com sucesso!");
+        fecharEdicaoChavePix();
+    } catch (erro) {
+        alert("❌ Erro ao salvar: " + erro.message);
+    }
 };
 
 window.showAdminLogin = function() {
@@ -131,6 +200,8 @@ window.handleLogin = function(event) {
         btnSettings.classList.add('hidden');
         btnListaCompras.classList.add('hidden');
         btnLogs.classList.add('hidden');
+        // ✅ Esconde edição de chave PIX para usuário comum
+        if(btnEditarChavePix) btnEditarChavePix.classList.add('hidden');
         renderGifts();
     }
 };
@@ -182,6 +253,7 @@ window.openPixModal = function(giftId) {
     if (!gift) return;
 
     itemAtualId = giftId;
+    fecharEdicaoChavePix(); // Reseta edição ao abrir
 
     if(gift.reservadoPor) {
         modalReservadoPor.textContent = gift.reservadoPor;
@@ -198,6 +270,11 @@ window.openPixModal = function(giftId) {
     pixCopiaCola.textContent = gift.pixKey;
     modalQrCode.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(gift.pixKey)}`;
     
+    // ✅ Mostra botão de editar chave apenas para ADM
+    if(btnEditarChavePix) {
+        btnEditarChavePix.classList.toggle('hidden', !isAdmin);
+    }
+
     pixModal.classList.remove('hidden');
 };
 
@@ -235,7 +312,9 @@ window.confirmarReserva = async function(event) {
 
         registrarLog("RESERVA", `Item reservado por ${nomePessoa}`, id);
         alert("✅ Reserva confirmada! Agora é só pagar o PIX.");
-        closeModal('reserva-modal');
+        // ✅ Ao confirmar, fecha sem cancelar
+        const modal = document.getElementById('reserva-modal');
+        if(modal) modal.classList.add('hidden');
         openPixModal(id);
 
     } catch (erro) {
@@ -257,7 +336,9 @@ window.confirmarCompra = async function() {
         });
         registrarLog("VENDA", `Compra confirmada → adicionado à lista de comprados`, itemAtualId);
         alert("✅ Compra confirmada! Item registrado na lista de comprados.");
-        closeModal('pix-modal');
+        // ✅ Ao confirmar, fecha sem cancelar
+        const modal = document.getElementById('pix-modal');
+        if(modal) modal.classList.add('hidden');
     } catch (erro) {
         alert("❌ Erro: " + erro.message);
     }
@@ -276,7 +357,8 @@ window.cancelarReserva = async function() {
         });
         registrarLog("CANCELAMENTO", `Reserva cancelada. Item disponível.`, itemAtualId);
         alert("✅ Reserva cancelada! Item liberado.");
-        closeModal('pix-modal');
+        const modal = document.getElementById('pix-modal');
+        if(modal) modal.classList.add('hidden');
     } catch (erro) {
         alert("❌ Erro: " + erro.message);
     }
@@ -367,8 +449,9 @@ window.abrirLogs = async function() {
                 if(log.tipo === 'CRIACAO') corTipo = 'text-green-600';
                 if(log.tipo === 'RESERVA') corTipo = 'text-purple-600';
                 if(log.tipo === 'VENDA') corTipo = 'text-green-700';
-                if(log.tipo === 'CANCELAMENTO') corTipo = 'text-orange-600';
+                if(log.tipo === 'CANCELAMENTO' || log.tipo === 'CANCELAMENTO_AO_FECHAR') corTipo = 'text-orange-600';
                 if(log.tipo === 'REATIVACAO') corTipo = 'text-cyan-600';
+                if(log.tipo === 'ALTERACAO_CHAVE_PIX') corTipo = 'text-indigo-600';
 
                 div.innerHTML = `
                     <div>
