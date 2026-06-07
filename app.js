@@ -27,6 +27,7 @@ const editPrice = document.getElementById('edit-price');
 const editIcon = document.getElementById('edit-icon');
 const editImagem = document.getElementById('edit-imagem');
 const editPixKey = document.getElementById('edit-pixkey');
+const editPixAlternativa = document.getElementById('edit-pix-alternativa'); // NOVO
 const btnDelete = document.getElementById('btn-delete');
 
 const pixModal = document.getElementById('pix-modal');
@@ -34,14 +35,10 @@ const modalGiftName = document.getElementById('modal-gift-name');
 const modalGiftValue = document.getElementById('modal-gift-value');
 const modalQrCode = document.getElementById('modal-qr-code');
 const pixCopiaCola = document.getElementById('pix-copia-cola');
+const pixAlternativa = document.getElementById('pix-alternativa'); // NOVO
 const modalReservadoPor = document.getElementById('modal-reservado-por');
 const modalMensagemRecado = document.getElementById('modal-mensagem-recado');
 const botoesAcaoPix = document.getElementById('botoes-acao-pix');
-// ✅ NOVOS ELEMENTOS PARA EDIÇÃO DA CHAVE PIX
-const btnEditarChavePix = document.getElementById('btn-editar-chave-pix');
-const inputEditarChavePix = document.getElementById('input-editar-chave-pix');
-const btnSalvarChavePix = document.getElementById('btn-salvar-chave-pix');
-const btnCancelarEdicaoPix = document.getElementById('btn-cancelar-edicao-pix');
 
 const reservaModal = document.getElementById('reserva-modal');
 const reservaId = document.getElementById('reserva-id');
@@ -70,8 +67,6 @@ window.closeModal = function(modalId) {
 
     // ✅ Se fechar o modal de PIX/COMPRA → CANCELA A COMPRA/RESERVA
     if(modalId === 'pix-modal' && itemAtualId) {
-        // ✅ Reseta modo de edição da chave ao fechar
-        fecharEdicaoChavePix();
         cancelarReservaAoFechar(itemAtualId);
     }
 };
@@ -96,43 +91,6 @@ window.copyPixKey = function() {
     navigator.clipboard.writeText(pixCopiaCola.textContent)
         .then(() => alert("✅ Código PIX copiado!"))
         .catch(() => alert("❌ Erro ao copiar, copie manualmente."));
-};
-
-// ✅ FUNÇÕES DE EDIÇÃO DA CHAVE PIX (SÓ ADM)
-window.iniciarEdicaoChavePix = function() {
-    if(!isAdmin) return;
-    pixCopiaCola.classList.add('hidden');
-    btnEditarChavePix.classList.add('hidden');
-    inputEditarChavePix.value = pixCopiaCola.textContent;
-    inputEditarChavePix.classList.remove('hidden');
-    btnSalvarChavePix.classList.remove('hidden');
-    btnCancelarEdicaoPix.classList.remove('hidden');
-};
-
-window.fecharEdicaoChavePix = function() {
-    pixCopiaCola.classList.remove('hidden');
-    btnEditarChavePix.classList.remove('hidden');
-    inputEditarChavePix.classList.add('hidden');
-    btnSalvarChavePix.classList.add('hidden');
-    btnCancelarEdicaoPix.classList.add('hidden');
-};
-
-window.salvarChavePix = async function() {
-    if(!isAdmin || !itemAtualId) return;
-    const novaChave = inputEditarChavePix.value.trim();
-    if(!novaChave) { alert("❌ Chave PIX não pode ficar vazia!"); return; }
-
-    try {
-        const itemRef = ref(db, `gifts/${itemAtualId}`);
-        await update(itemRef, { pixKey: novaChave });
-        pixCopiaCola.textContent = novaChave;
-        modalQrCode.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(novaChave)}`;
-        registrarLog("ALTERACAO_CHAVE_PIX", `Chave PIX alterada diretamente na janela`, itemAtualId);
-        alert("✅ Chave PIX atualizada com sucesso!");
-        fecharEdicaoChavePix();
-    } catch (erro) {
-        alert("❌ Erro ao salvar: " + erro.message);
-    }
 };
 
 window.showAdminLogin = function() {
@@ -200,8 +158,6 @@ window.handleLogin = function(event) {
         btnSettings.classList.add('hidden');
         btnListaCompras.classList.add('hidden');
         btnLogs.classList.add('hidden');
-        // ✅ Esconde edição de chave PIX para usuário comum
-        if(btnEditarChavePix) btnEditarChavePix.classList.add('hidden');
         renderGifts();
     }
 };
@@ -228,6 +184,7 @@ window.openNewItemModal = function() {
     editIcon.value = "";
     editImagem.value = "";
     editPixKey.value = "";
+    editPixAlternativa.value = ""; // LIMPA CAMPO ALTERNATIVO
     btnDelete.classList.add('hidden');
     editModal.classList.remove('hidden');
 };
@@ -243,6 +200,7 @@ window.openEditModal = function(giftId) {
         editIcon.value = gift.icon;
         editImagem.value = gift.imagem || "";
         editPixKey.value = gift.pixKey;
+        editPixAlternativa.value = gift.pixAlternativa || ""; // CARREGA CHAVE ALTERNATIVA
         btnDelete.classList.remove('hidden');
         editModal.classList.remove('hidden');
     }
@@ -253,7 +211,6 @@ window.openPixModal = function(giftId) {
     if (!gift) return;
 
     itemAtualId = giftId;
-    fecharEdicaoChavePix(); // Reseta edição ao abrir
 
     if(gift.reservadoPor) {
         modalReservadoPor.textContent = gift.reservadoPor;
@@ -268,13 +225,9 @@ window.openPixModal = function(giftId) {
     modalGiftName.textContent = gift.name;
     modalGiftValue.textContent = gift.price;
     pixCopiaCola.textContent = gift.pixKey;
+    pixAlternativa.textContent = gift.pixAlternativa || ""; // MOSTRA CHAVE ALTERNATIVA
     modalQrCode.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(gift.pixKey)}`;
     
-    // ✅ Mostra botão de editar chave apenas para ADM
-    if(btnEditarChavePix) {
-        btnEditarChavePix.classList.toggle('hidden', !isAdmin);
-    }
-
     pixModal.classList.remove('hidden');
 };
 
@@ -451,7 +404,6 @@ window.abrirLogs = async function() {
                 if(log.tipo === 'VENDA') corTipo = 'text-green-700';
                 if(log.tipo === 'CANCELAMENTO' || log.tipo === 'CANCELAMENTO_AO_FECHAR') corTipo = 'text-orange-600';
                 if(log.tipo === 'REATIVACAO') corTipo = 'text-cyan-600';
-                if(log.tipo === 'ALTERACAO_CHAVE_PIX') corTipo = 'text-indigo-600';
 
                 div.innerHTML = `
                     <div>
@@ -491,7 +443,8 @@ window.saveItem = async function(event) {
         price: editPrice.value.trim(),
         icon: editIcon.value.trim(),
         imagem: editImagem.value.trim() || "",
-        pixKey: editPixKey.value.trim()
+        pixKey: editPixKey.value.trim(),
+        pixAlternativa: editPixAlternativa.value.trim() // SALVA CHAVE ALTERNATIVA
     };
 
     try {
@@ -628,50 +581,4 @@ function renderGifts() {
     giftsGrid.innerHTML = '';
     
     if(giftsData.length === 0) {
-        giftsGrid.innerHTML = '<p class="text-center text-gray-500 col-span-full bg-white/80 p-4 rounded-xl">Nenhum presente cadastrado ainda.</p>';
-        return;
-    }
-
-    giftsData.forEach(gift => {
-        const card = document.createElement('div');
-        card.className = `card-item bg-white rounded-xl shadow-md p-6 border border-gray-100 flex flex-col justify-between hover:shadow-lg transition duration-200 relative ${gift.reservadoPor ? 'reservado' : ''}`;
-        
-        if(gift.imagem && gift.imagem !== "") {
-            const imgTest = new Image();
-            imgTest.onload = () => card.style.backgroundImage = `url("${gift.imagem}")`;
-            imgTest.onerror = () => card.style.backgroundImage = "";
-            imgTest.src = gift.imagem;
-        }
-
-        // Botão editar só admin
-        const adminEditButton = isAdmin ? `
-            <button onclick="openEditModal('${gift.id}')" class="absolute top-2 right-10 z-10 text-gray-700 hover:text-pink-600 bg-white/80 p-1.5 rounded-full text-lg transition-transform hover:scale-110" title="Editar Item">✏️</button>
-        ` : '';
-
-        // ✅ Botão REATIVAR NO PRÓPRIO ITEM, SÓ ADMIN
-        const btnReativar = (isAdmin && gift.reservadoPor) ? `
-            <button onclick="reativarItem('${gift.id}')" class="absolute top-2 right-2 z-10 text-xs bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded transition" title="Reativar Item (mantém dados)">🔄 Reativar</button>
-        ` : '';
-
-        // Botão de ação
-        const botaoAcao = gift.reservadoPor 
-            ? `<button onclick="openPixModal('${gift.id}')" class="w-full bg-gray-500/90 text-white text-sm font-semibold py-2.5 px-4 rounded-lg">Ver Recado / PIX</button>`
-            : `<button onclick="abrirReserva('${gift.id}', '${gift.name.replace(/'/g, "\\'")}')" class="w-full bg-pink-500/90 hover:bg-pink-600 text-white text-sm font-semibold py-2.5 px-4 rounded-lg transition duration-150">Escolher este</button>`;
-
-        card.innerHTML = `
-            <div class="card-overlay"></div>
-            ${adminEditButton} 
-            ${btnReativar}
-            <div class="card-content">
-                <div class="text-4xl mb-4 bg-pink-50/80 inline-block p-3 rounded-xl flex items-center justify-center">
-                    <img src="${gift.icon}" alt="Ícone" class="icon-img" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3099/3099358.png'">
-                </div>
-                <h2 class="text-lg font-bold text-gray-800 mb-1">${gift.name}</h2>
-                <p class="text-gray-600 text-sm mb-4">Valor estimado</p>
-                <p class="text-xl font-extrabold text-pink-600 mb-4">${gift.price}</p>
-                ${botaoAcao}
-            </div>
-        `;
-        giftsGrid.appendChild(card);
-    });
-}
+        giftsGrid.innerHTML = '<p class="text
