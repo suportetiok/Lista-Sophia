@@ -198,8 +198,14 @@
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Chave PIX</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Chave PIX Principal</label>
                     <input type="text" id="edit-pixkey" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                </div>
+
+                <!-- CAMPO ADICIONADO: CHAVE ALTERNATIVA -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Chave PIX Alternativa</label>
+                    <input type="text" id="edit-pix-alternativa" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Chave alternativa (opcional)">
                 </div>
 
                 <div class="flex gap-2 pt-2">
@@ -227,25 +233,21 @@
                 <img id="modal-qr-code" src="" alt="QR Code PIX" class="w-48 h-48 object-contain rounded-lg shadow">
             </div>
 
-            <!-- ✅ CHAVE PIX COPIÁVEL E EDITÁVEL -->
-            <div class="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                <p class="text-xs text-gray-500 mb-1 text-center">Chave PIX:</p>
-                
-                <!-- Chave visível e copiável -->
-                <div class="flex items-center justify-center gap-2 mb-2 flex-wrap">
-                    <span id="pix-copia-cola" class="font-mono text-sm font-medium text-gray-800 break-all text-center"></span>
-                    <button onclick="copyPixKey()" class="text-blue-600 hover:text-blue-800 text-lg shrink-0" title="Copiar chave">📋</button>
-                    <!-- Botão editar só aparece para ADM -->
-                    <button id="btn-editar-chave-pix" onclick="iniciarEdicaoChavePix()" class="text-gray-600 hover:text-pink-600 text-lg shrink-0 hidden" title="Editar chave PIX">✏️</button>
+            <!-- ✅ CHAVE PIX PRINCIPAL -->
+            <div class="mb-3 p-2 bg-gray-50 rounded-lg border border-gray-200">
+                <p class="text-xs text-gray-500 mb-1">Chave PIX:</p>
+                <div class="flex items-center justify-center gap-2">
+                    <span id="pix-copia-cola" class="font-mono text-sm font-medium text-gray-800 break-all"></span>
+                    <button onclick="copyPixKey()" class="text-blue-600 hover:text-blue-800 text-lg" title="Copiar chave">📋</button>
                 </div>
+            </div>
 
-                <!-- Área de edição (só ADM) -->
-                <div class="flex flex-col gap-2 hidden" id="area-edicao-chave">
-                    <input type="text" id="input-editar-chave-pix" class="w-full px-3 py-2 border border-gray-300 rounded text-sm" placeholder="Nova chave PIX">
-                    <div class="flex gap-2 justify-center">
-                        <button id="btn-salvar-chave-pix" onclick="salvarChavePix()" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm hidden">Salvar</button>
-                        <button id="btn-cancelar-edicao-pix" onclick="fecharEdicaoChavePix()" class="bg-gray-400 hover:bg-gray-500 text-white px-3 py-1 rounded text-sm hidden">Cancelar</button>
-                    </div>
+            <!-- ✅ CAMPO ABAIXO DO QR CODE: CHAVE ALTERNATIVA COM BOTÃO COPIAR (EXATAMENTE O QUE PEDIU) -->
+            <div id="area-chave-alternativa" class="p-2 bg-pink-50 rounded-lg border border-pink-100">
+                <p class="text-xs text-gray-600 mb-1">Chave Alternativa:</p>
+                <div class="flex items-center justify-center gap-2">
+                    <span id="pix-alternativa" class="font-mono text-sm font-medium text-gray-800 break-all"></span>
+                    <button onclick="copiarChaveAlternativa()" class="text-green-600 hover:text-green-800 text-lg" title="Copiar chave alternativa">📋</button>
                 </div>
             </div>
 
@@ -376,5 +378,19 @@
     <!-- Importação dos Scripts -->
     <script type="module" src="firebase.js"></script>
     <script type="module" src="app.js"></script>
+
+    <!-- ✅ FUNÇÃO PARA COPIAR CHAVE ALTERNATIVA -->
+    <script>
+        function copiarChaveAlternativa() {
+            const texto = document.getElementById('pix-alternativa').textContent;
+            if(texto && texto.trim() !== "") {
+                navigator.clipboard.writeText(texto)
+                    .then(() => alert("✅ Chave alternativa copiada!"))
+                    .catch(() => alert("❌ Erro ao copiar, copie manualmente."));
+            } else {
+                alert("⚠️ Nenhuma chave alternativa cadastrada para este item.");
+            }
+        }
+    </script>
 </body>
 </html>
