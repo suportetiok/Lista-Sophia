@@ -202,7 +202,7 @@
                     <input type="text" id="edit-pixkey" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
                 </div>
 
-                <!-- CAMPO ADICIONADO: CHAVE ALTERNATIVA -->
+                <!-- CAMPO CHAVE ALTERNATIVA -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Chave PIX Alternativa</label>
                     <input type="text" id="edit-pix-alternativa" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Chave alternativa (opcional)">
@@ -233,7 +233,7 @@
                 <img id="modal-qr-code" src="" alt="QR Code PIX" class="w-48 h-48 object-contain rounded-lg shadow">
             </div>
 
-            <!-- ✅ CHAVE PIX PRINCIPAL -->
+            <!-- CHAVE PIX PRINCIPAL -->
             <div class="mb-3 p-2 bg-gray-50 rounded-lg border border-gray-200">
                 <p class="text-xs text-gray-500 mb-1">Chave PIX:</p>
                 <div class="flex items-center justify-center gap-2">
@@ -242,7 +242,7 @@
                 </div>
             </div>
 
-            <!-- ✅ CAMPO ABAIXO DO QR CODE: CHAVE ALTERNATIVA COM BOTÃO COPIAR (EXATAMENTE O QUE PEDIU) -->
+            <!-- ✅ CHAVE ALTERNATIVA ABAIXO DO QR CODE (EXATO COMO PEDIU) -->
             <div id="area-chave-alternativa" class="p-2 bg-pink-50 rounded-lg border border-pink-100">
                 <p class="text-xs text-gray-600 mb-1">Chave Alternativa:</p>
                 <div class="flex items-center justify-center gap-2">
@@ -379,7 +379,7 @@
     <script type="module" src="firebase.js"></script>
     <script type="module" src="app.js"></script>
 
-    <!-- ✅ FUNÇÃO PARA COPIAR CHAVE ALTERNATIVA -->
+    <!-- FUNÇÃO COPIAR CHAVE ALTERNATIVA -->
     <script>
         function copiarChaveAlternativa() {
             const texto = document.getElementById('pix-alternativa').textContent;
@@ -388,7 +388,7 @@
                     .then(() => alert("✅ Chave alternativa copiada!"))
                     .catch(() => alert("❌ Erro ao copiar, copie manualmente."));
             } else {
-                alert("⚠️ Nenhuma chave alternativa cadastrada para este item.");
+                alert("⚠️ Nenhuma chave alternativa cadastrada.");
             }
         }
     </script>
