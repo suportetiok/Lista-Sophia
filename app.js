@@ -1,396 +1,358 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lista de Presentes</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#EC4899',
-                        secondary: '#F472B6',
-                        light: '#FDF2F8',
-                        dark: '#831843'
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'system-ui', 'sans-serif'],
-                    },
-                }
-            }
+import { db, auth, providerGoogle, ref, onValue, set, update, push, remove, get, signInWithEmailAndPassword, signInWithPopup, signOut } from './firebase.js';
+
+let isAdmin = false;
+let giftsData = [];
+let siteConfig = {};
+let usuarioAtualNome = "";
+let itemAtualId = "";
+
+// Elementos
+const screenLogin = document.getElementById('screen-login');
+const screenAdminLogin = document.getElementById('screen-admin-login');
+const screenDashboard = document.getElementById('screen-dashboard');
+const giftsGrid = document.getElementById('gifts-grid');
+const welcomeText = document.getElementById('welcomeText');
+const footerText = document.getElementById('footer-text');
+const paginaPrincipal = document.getElementById('pagina-principal');
+const btnNewItem = document.getElementById('btn-new-item');
+const btnSettings = document.getElementById('btn-settings');
+const btnListaCompras = document.getElementById('btn-lista-compras');
+const btnLogs = document.getElementById('btn-logs');
+
+// Modais
+const editModal = document.getElementById('edit-modal');
+const editId = document.getElementById('edit-id');
+const editName = document.getElementById('edit-name');
+const editPrice = document.getElementById('edit-price');
+const editIcon = document.getElementById('edit-icon');
+const editImagem = document.getElementById('edit-imagem');
+const editPixKey = document.getElementById('edit-pixkey');
+const editPixAlternativa = document.getElementById('edit-pix-alternativa');
+const btnDelete = document.getElementById('btn-delete');
+
+const pixModal = document.getElementById('pix-modal');
+const modalGiftName = document.getElementById('modal-gift-name');
+const modalGiftValue = document.getElementById('modal-gift-value');
+const modalQrCode = document.getElementById('modal-qr-code');
+const pixCopiaCola = document.getElementById('pix-copia-cola');
+const pixAlternativa = document.getElementById('pix-alternativa');
+const modalReservadoPor = document.getElementById('modalReservadoPor');
+const modalMensagemRecado = document.getElementById('modalMensagemRecado');
+const botoesAcaoPix = document.getElementById('botoes-acao-pix');
+
+const reservaModal = document.getElementById('reserva-modal');
+const reservaId = document.getElementById('reserva-id');
+const reservaNomeItem = document.getElementById('reserva-nome-item');
+const reservaNome = document.getElementById('reserva-nome');
+const reservaMensagem = document.getElementById('reserva-mensagem');
+
+const settingsModal = document.getElementById('settings-modal');
+const cfgLoginTitle = document.getElementById('cfg-login-title');
+const cfgLoginSubtitle = document.getElementById('cfg-login-subtitle');
+const cfgMainTitle = document.getElementById('cfg-main-title');
+const cfgWelcomeText = document.getElementById('cfg-welcome-text');
+const cfgBgImage = document.getElementById('cfg-bg-image');
+const cfgFooterText = document.getElementById('cfg-footer-text');
+
+
+// Fechar Modal
+window.closeModal = function(modalId) {
+    const modal = document.getElementById(modalId);
+    if(modal) modal.classList.add('hidden');
+
+    if(modalId === 'reserva-modal' && reservaId.value) cancelarReservaAoFechar(reservaId.value);
+    if(modalId === 'pix-modal' && itemAtualId) cancelarReservaAoFechar(itemAtualId);
+};
+
+async function cancelarReservaAoFechar(idItem) {
+    try {
+        const itemRef = ref(db, `gifts/${idItem}`);
+        await update(itemRef, { reservadoPor: null, mensagem: null, status: null });
+        registrarLog("CANCELAMENTO_AO_FECHAR", `Janela fechada → reserva cancelada`, idItem);
+    } catch (erro) { console.log("Aviso:", erro.message); }
+}
+
+window.copyPixKey = function() {
+    navigator.clipboard.writeText(pixCopiaCola.textContent)
+        .then(() => alert("✅ Chave copiada!"))
+        .catch(() => alert("❌ Erro ao copiar"));
+};
+
+window.showAdminLogin = () => { screenLogin.classList.add('hidden'); screenAdminLogin.classList.remove('hidden'); };
+window.hideAdminLogin = () => { screenAdminLogin.classList.add('hidden'); screenLogin.classList.remove('hidden'); };
+
+window.handleAdminLogin = async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('admin-email').value;
+    const senha = document.getElementById('admin-password').value;
+    try {
+        await signInWithEmailAndPassword(auth, email, senha);
+        isAdmin = true; usuarioAtualNome = "Administrador";
+        screenAdminLogin.classList.add('hidden'); screenDashboard.classList.remove('hidden');
+        mostrarBotoesAdmin(); atualizarSaudacao(); renderGifts();
+    } catch (erro) { alert("❌ Erro: " + erro.message); }
+};
+
+window.loginComGoogle = async () => {
+    try {
+        const res = await signInWithPopup(auth, providerGoogle);
+        isAdmin = true; usuarioAtualNome = res.user.displayName || "Admin";
+        screenAdminLogin.classList.add('hidden'); screenDashboard.classList.remove('hidden');
+        mostrarBotoesAdmin(); atualizarSaudacao(); renderGifts();
+    } catch (erro) { alert("❌ Erro Google: " + erro.message); }
+};
+
+window.handleLogin = (e) => {
+    e.preventDefault();
+    const nome = document.getElementById('username').value.trim();
+    if(nome) {
+        isAdmin = false; usuarioAtualNome = nome;
+        atualizarSaudacao(); screenLogin.classList.add('hidden'); screenDashboard.classList.remove('hidden');
+        btnNewItem.classList.add('hidden'); btnSettings.classList.add('hidden'); btnListaCompras.classList.add('hidden'); btnLogs.classList.add('hidden');
+        renderGifts();
+    }
+};
+
+window.handleLogout = async () => {
+    await signOut().catch(()=>{});
+    screenDashboard.classList.add('hidden'); screenLogin.classList.remove('hidden');
+    isAdmin = false; usuarioAtualNome = "";
+};
+
+window.openNewItemModal = () => {
+    if(!isAdmin) return alert("❌ Acesso restrito");
+    editModal.classList.remove('hidden');
+    document.getElementById('edit-modal-title').textContent = "Adicionar Item";
+    editId.value = ""; editName.value = ""; editPrice.value = ""; editIcon.value = ""; editImagem.value = ""; editPixKey.value = ""; editPixAlternativa.value = "";
+    btnDelete.classList.add('hidden');
+};
+
+window.openEditModal = (id) => {
+    if(!isAdmin) return alert("❌ Acesso restrito");
+    const item = giftsData.find(g=>g.id===id);
+    if(item) {
+        editModal.classList.remove('hidden');
+        document.getElementById('edit-modal-title').textContent = "Editar Item";
+        editId.value = id; editName.value = item.name; editPrice.value = item.price; editIcon.value = item.icon; editImagem.value = item.imagem || "";
+        editPixKey.value = item.pixKey; editPixAlternativa.value = item.pixAlternativa || "";
+        btnDelete.classList.remove('hidden');
+    }
+};
+
+window.openPixModal = (id) => {
+    const item = giftsData.find(g=>g.id===id);
+    if(!item) return;
+    itemAtualId = id;
+
+    if(item.reservadoPor) {
+        modalReservadoPor.textContent = item.reservadoPor;
+        modalMensagemRecado.textContent = item.mensagem || "Sem mensagem";
+        botoesAcaoPix.classList.remove('hidden');
+    } else {
+        modalReservadoPor.textContent = "Ainda não reservado";
+        modalMensagemRecado.textContent = "";
+        botoesAcaoPix.classList.add('hidden');
+    }
+
+    modalGiftName.textContent = item.name;
+    modalGiftValue.textContent = item.price;
+    pixCopiaCola.textContent = item.pixKey;
+    pixAlternativa.textContent = item.pixAlternativa || "";
+    modalQrCode.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(item.pixKey)}`;
+    pixModal.classList.remove('hidden');
+};
+
+window.abrirReserva = (id, nome) => {
+    const item = giftsData.find(g=>g.id===id);
+    if(item?.reservadoPor) return alert("⚠️ Já reservado");
+    reservaId.value = id; reservaNomeItem.textContent = nome; reservaNome.value = usuarioAtualNome; reservaMensagem.value = "";
+    reservaModal.classList.remove('hidden');
+};
+
+window.confirmarReserva = async (e) => {
+    e.preventDefault();
+    const id = reservaId.value;
+    const nome = reservaNome.value.trim();
+    const msg = reservaMensagem.value.trim();
+    if(!nome) return alert("❌ Nome obrigatório");
+    try {
+        await update(ref(db, `gifts/${id}`), { reservadoPor: nome, mensagem: msg, status: 'reservado' });
+        registrarLog("RESERVA", `Reservado por ${nome}`, id);
+        closeModal('reserva-modal'); openPixModal(id);
+    } catch (erro) { alert("❌ Erro: " + erro.message); }
+};
+
+window.confirmarCompra = async () => {
+    if(!confirm("Confirmar compra?")) return;
+    try {
+        await update(ref(db, `gifts/${itemAtualId}`), { status: 'pago' });
+        registrarLog("VENDA", "Compra confirmada", itemAtualId);
+        closeModal('pix-modal');
+    } catch (erro) { alert("❌ Erro: " + erro.message); }
+};
+
+window.cancelarReserva = async () => {
+    if(!confirm("Cancelar reserva?")) return;
+    try {
+        await update(ref(db, `gifts/${itemAtualId}`), { reservadoPor: null, mensagem: null, status: null });
+        registrarLog("CANCELAMENTO", "Reserva cancelada", itemAtualId);
+        closeModal('pix-modal');
+    } catch (erro) { alert("❌ Erro: " + erro.message); }
+};
+
+window.reativarItem = async (id) => {
+    if(!isAdmin) return;
+    if(!confirm("Reativar? Mantém dados na lista de comprados")) return;
+    try {
+        await update(ref(db, `gifts/${id}`), { status: null });
+        registrarLog("REATIVACAO", "Item reativado", id);
+        renderGifts();
+    } catch (erro) { alert("❌ Erro: " + erro.message); }
+};
+
+window.abrirListaCompras = async () => {
+    if(!isAdmin) return;
+    const conteudo = document.getElementById('lista-compras-conteudo');
+    const comprados = giftsData.filter(g=>g.reservadoPor);
+    conteudo.innerHTML = comprados.length === 0 ? "<p class='text-center text-gray-500'>Nenhum item comprado</p>" :
+        comprados.map(i => `
+        <div class="p-3 border rounded bg-white">
+            <p class="font-bold">${i.name} - ${i.price}</p>
+            <p class="text-sm">Comprador: ${i.reservadoPor}</p>
+            <p class="text-sm italic">Recado: ${i.mensagem || '---'}</p>
+            <p class="text-xs ${i.status==='pago'?'text-green-600':i.status==='reservado'?'text-orange-500':'text-blue-600'}">Status: ${i.status||'Reativado'}</p>
+        </div>`).join('');
+    document.getElementById('lista-compras-modal').classList.remove('hidden');
+};
+
+window.abrirLogs = async () => {
+    if(!isAdmin) return;
+    const conteudo = document.getElementById('logs-conteudo');
+    try {
+        const snap = await get(ref(db, 'logs'));
+        const logs = []; snap.forEach(c=>logs.unshift({id:c.key,...c.val()}));
+        conteudo.innerHTML = logs.length === 0 ? "<p class='text-center text-gray-500'>Nenhum registro</p>" :
+            logs.map(l=>`<div class="p-2 border-b"><span class="text-xs text-gray-500">[${l.data} ${l.hora}]</span> <span class="font-semibold">${l.tipo}</span> ${l.descricao} <span class="text-xs">por ${l.usuario}</span></div>`).join('');
+        document.getElementById('logs-modal').classList.remove('hidden');
+    } catch (erro) { conteudo.innerHTML = "<p class='text-red-500'>Erro ao carregar</p>"; }
+};
+
+window.openSettingsModal = () => {
+    if(!isAdmin) return;
+    cfgLoginTitle.value = siteConfig.loginTitle || "";
+    cfgLoginSubtitle.value = siteConfig.loginSubtitle || "";
+    cfgMainTitle.value = siteConfig.mainTitle || "";
+    cfgWelcomeText.value = siteConfig.welcomeText || "";
+    cfgBgImage.value = siteConfig.backgroundImage || "";
+    cfgFooterText.value = siteConfig.footerText || "";
+    settingsModal.classList.remove('hidden');
+};
+
+window.saveItem = async (e) => {
+    e.preventDefault();
+    if(!isAdmin) return;
+    const item = {
+        name: editName.value.trim(),
+        price: editPrice.value.trim(),
+        icon: editIcon.value.trim(),
+        imagem: editImagem.value.trim(),
+        pixKey: editPixKey.value.trim(),
+        pixAlternativa: editPixAlternativa.value.trim()
+    };
+    try {
+        if(editId.value) {
+            await update(ref(db, `gifts/${editId.value}`), item);
+            registrarLog("EDIÇÃO", `Item alterado: ${item.name}`, editId.value);
+        } else {
+            const novaRef = push(ref(db, 'gifts'));
+            await set(novaRef, item);
+            registrarLog("CRIAÇÃO", `Novo item: ${item.name}`, novaRef.key);
         }
-    </script>
-    <style type="text/tailwindcss">
-        @layer utilities {
-            .content-auto {
-                content-visibility: auto;
-            }
-            .modal-overlay {
-                @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4;
-            }
-            .card-item {
-                @apply relative overflow-hidden;
-            }
-            .card-overlay {
-                @apply absolute inset-0 bg-white/70 -z-10;
-            }
-            .reservado {
-                @apply opacity-70 border-2 border-gray-400 bg-gray-100/50;
-            }
-            .icon-img {
-                @apply w-12 h-12 object-contain;
-            }
-        }
-    </style>
-</head>
-<body class="bg-gradient-to-br from-pink-100 to-purple-200 min-h-screen font-sans">
+        closeModal('edit-modal');
+    } catch (erro) { alert("❌ Erro: " + erro.message); }
+};
 
-    <!-- Tela de Login -->
-    <section id="screen-login" class="fixed inset-0 z-40 flex items-center justify-center p-4 bg-gradient-to-br from-pink-100 to-purple-200">
-        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md transform transition-all">
-            <div class="text-center mb-8">
-                <h1 id="login-title" class="text-[clamp(1.8rem,4vw,2.5rem)] font-bold text-primary mb-2">Lista de Presentes</h1>
-                <p id="login-subtitle" class="text-gray-600">Identifique-se para acessar</p>
+window.deleteItem = async () => {
+    if(!isAdmin || !confirm("Excluir item?")) return;
+    try {
+        const nome = giftsData.find(g=>g.id===editId.value)?.name;
+        await remove(ref(db, `gifts/${editId.value}`));
+        registrarLog("EXCLUSÃO", `Item excluído: ${nome}`, editId.value);
+        closeModal('edit-modal');
+    } catch (erro) { alert("❌ Erro: " + erro.message); }
+};
+
+window.saveSettings = async (e) => {
+    e.preventDefault();
+    if(!isAdmin) return;
+    const dados = {
+        loginTitle: cfgLoginTitle.value, loginSubtitle: cfgLoginSubtitle.value,
+        mainTitle: cfgMainTitle.value, welcomeText: cfgWelcomeText.value,
+        backgroundImage: cfgBgImage.value, footerText: cfgFooterText.value
+    };
+    try {
+        await update(ref(db, 'configuracoes'), dados);
+        registrarLog("CONFIG", "Configurações alteradas");
+        closeModal('settings-modal');
+    } catch (erro) { alert("❌ Erro: " + erro.message); }
+};
+
+
+document.addEventListener("DOMContentLoaded", () => {
+    onValue(ref(db, 'configuracoes'), snap => {
+        siteConfig = snap.val() || {};
+        document.getElementById('login-title').textContent = siteConfig.loginTitle || "Lista de Presentes";
+        document.getElementById('login-subtitle').textContent = siteConfig.loginSubtitle || "Identifique-se";
+        document.getElementById('main-title').textContent = siteConfig.mainTitle || "Presentes";
+        footerText.textContent = siteConfig.footerText || "© 2026";
+        if(siteConfig.backgroundImage) paginaPrincipal.style.backgroundImage = `url(${siteConfig.backgroundImage})`;
+        if(usuarioAtualNome) atualizarSaudacao();
+    });
+
+    onValue(ref(db, 'gifts'), snap => {
+        giftsData = [];
+        snap.forEach(c => giftsData.push({id:c.key, ...c.val()}));
+        renderGifts();
+    });
+});
+
+
+function atualizarSaudacao() {
+    welcomeText.innerHTML = (siteConfig.welcomeText || "Olá, [NOME]! Escolha um item.")
+        .replace("[NOME]", `<span class="font-semibold text-pink-600">${usuarioAtualNome}</span>`);
+}
+
+function mostrarBotoesAdmin() {
+    btnNewItem.classList.remove('hidden'); btnSettings.classList.remove('hidden');
+    btnListaCompras.classList.remove('hidden'); btnLogs.classList.remove('hidden');
+}
+
+function registrarLog(tipo, descricao, itemId=null) {
+    const agora = new Date();
+    push(ref(db, 'logs'), {
+        tipo, descricao, itemId,
+        data: agora.toLocaleDateString('pt-BR'),
+        hora: agora.toLocaleTimeString('pt-BR'),
+        usuario: usuarioAtualNome
+    });
+}
+
+function renderGifts() {
+    if(!giftsGrid) return;
+    giftsGrid.innerHTML = giftsData.length === 0 ? "<p class='text-center col-span-full bg-white/80 p-4 rounded'>Nenhum item cadastrado</p>" :
+        giftsData.map(item => `
+        <div class="card-item bg-white rounded-xl shadow p-6 relative ${item.reservadoPor?'reservado':''}">
+            <div class="card-overlay"></div>
+            ${isAdmin?`<button onclick="openEditModal('${item.id}')" class="absolute top-2 right-10 text-gray-700 hover:text-pink-600">✏️</button>`:''}
+            ${isAdmin && item.reservadoPor?`<button onclick="reativarItem('${item.id}')" class="absolute top-2 right-2 text-xs bg-blue-500 text-white px-2 py-1 rounded">🔄 Reativar</button>`:''}
+            <div class="text-4xl mb-4 bg-pink-50/80 p-3 rounded-xl inline-block">
+                <img src="${item.icon}" class="icon-img" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3099/3099358.png'">
             </div>
-
-            <form onsubmit="handleLogin(event)" class="space-y-5">
-                <div>
-                    <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Seu nome</label>
-                    <input type="text" id="username" required 
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary transition"
-                        placeholder="Digite seu nome completo">
-                </div>
-
-                <button type="submit" 
-                    class="w-full bg-primary hover:bg-dark text-white font-semibold py-3 px-4 rounded-lg transition transform hover:scale-[1.02] active:scale-[0.98]">
-                    Acessar Lista
-                </button>
-
-                <div class="text-center mt-4">
-                    <button type="button" onclick="showAdminLogin()" class="text-sm text-gray-500 hover:text-primary transition">
-                        Acesso Administrador
-                    </button>
-                </div>
-            </form>
-        </div>
-    </section>
-
-    <!-- Tela de Login Admin -->
-    <section id="screen-admin-login" class="hidden fixed inset-0 z-40 flex items-center justify-center p-4 bg-gradient-to-br from-pink-100 to-purple-200">
-        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md transform transition-all">
-            <div class="text-center mb-8">
-                <h2 class="text-2xl font-bold text-gray-800 mb-2">Área Administrativa</h2>
-                <p class="text-gray-600">Acesso restrito</p>
-            </div>
-
-            <form onsubmit="handleAdminLogin(event)" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
-                    <input type="email" id="admin-email" required 
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary transition">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
-                    <input type="password" id="admin-password" required 
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary transition">
-                </div>
-
-                <button type="submit" 
-                    class="w-full bg-primary hover:bg-dark text-white font-semibold py-3 px-4 rounded-lg transition">
-                    Entrar
-                </button>
-
-                <button type="button" onclick="loginComGoogle()" 
-                    class="w-full bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2">
-                    <i class="fa fa-google"></i> Entrar com Google
-                </button>
-
-                <div class="text-center">
-                    <button type="button" onclick="hideAdminLogin()" class="text-sm text-gray-500 hover:text-primary transition">
-                        Voltar
-                    </button>
-                </div>
-            </form>
-        </div>
-    </section>
-
-    <!-- Tela Principal -->
-    <main id="screen-dashboard" class="hidden container mx-auto px-4 py-6 max-w-7xl">
-        <!-- Cabeçalho -->
-        <header class="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
-            <div>
-                <h2 id="main-title" class="text-[clamp(1.5rem,3vw,2.2rem)] font-bold text-gray-800">Presentes</h2>
-                <p id="welcomeText" class="text-gray-600 mt-1">Olá! Escolha um item para presentear via PIX.</p>
-            </div>
-
-            <div class="flex flex-wrap gap-2">
-                <button id="btn-new-item" onclick="openNewItemModal()" class="hidden bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition flex items-center gap-2">
-                    <i class="fa fa-plus"></i> Novo Item
-                </button>
-                <button id="btn-settings" onclick="openSettingsModal()" class="hidden bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition flex items-center gap-2">
-                    <i class="fa fa-cog"></i> Configurações
-                </button>
-                <button id="btn-lista-compras" onclick="abrirListaCompras()" class="hidden bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition flex items-center gap-2">
-                    <i class="fa fa-list-check"></i> Lista de Comprados
-                </button>
-                <button id="btn-logs" onclick="abrirLogs()" class="hidden bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition flex items-center gap-2">
-                    <i class="fa fa-history"></i> Logs
-                </button>
-                <button onclick="handleLogout()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition flex items-center gap-2">
-                    <i class="fa fa-sign-out"></i> Sair
-                </button>
-            </div>
-        </header>
-
-        <!-- Área de Fundo Personalizada -->
-        <div id="pagina-principal" class="relative rounded-2xl shadow-xl p-6 mb-8 min-h-[60vh] bg-cover bg-center bg-white/80 backdrop-blur-sm" style="background-image: url('');">
-            <div class="absolute inset-0 bg-white/60 -z-10 rounded-2xl"></div>
-
-            <!-- Grade de Presentes -->
-            <div id="gifts-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 relative z-10">
-                <!-- Itens carregados via JS -->
-            </div>
-        </div>
-
-        <!-- Rodapé -->
-        <footer class="text-center text-gray-600 text-sm">
-            <p id="footer-text">© 2026 Lista de Presentes</p>
-        </footer>
-    </main>
-
-
-    <!-- ============= MODAIS ============= -->
-
-    <!-- Modal Editar / Adicionar Item -->
-    <div id="edit-modal" class="hidden modal-overlay">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center mb-5">
-                <h3 id="edit-modal-title" class="text-xl font-bold text-gray-800">Editar Item</h3>
-                <button onclick="closeModal('edit-modal')" class="text-gray-500 hover:text-gray-800 text-xl">
-                    <i class="fa fa-times"></i>
-                </button>
-            </div>
-
-            <form onsubmit="saveItem(event)" class="space-y-4">
-                <input type="hidden" id="edit-id">
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Nome do Item</label>
-                    <input type="text" id="edit-name" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Valor (ex: R$ 50,00)</label>
-                    <input type="text" id="edit-price" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Link do Ícone</label>
-                    <input type="url" id="edit-icon" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="https://...">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Link da Imagem de Fundo</label>
-                    <input type="url" id="edit-imagem" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="https://...">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Chave PIX Principal</label>
-                    <input type="text" id="edit-pixkey" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                </div>
-
-                <!-- CAMPO CHAVE ALTERNATIVA -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Chave PIX Alternativa</label>
-                    <input type="text" id="edit-pix-alternativa" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Chave alternativa (opcional)">
-                </div>
-
-                <div class="flex gap-2 pt-2">
-                    <button type="submit" class="flex-1 bg-primary hover:bg-dark text-white py-2 rounded-lg">Salvar</button>
-                    <button type="button" id="btn-delete" onclick="deleteItem()" class="hidden bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg">Excluir</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal PIX -->
-    <div id="pix-modal" class="hidden modal-overlay">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md text-center">
-            <div class="flex justify-between items-center mb-4">
-                <h3 id="modal-gift-name" class="text-xl font-bold text-gray-800"></h3>
-                <button onclick="closeModal('pix-modal')" class="text-gray-500 hover:text-gray-800 text-xl">
-                    <i class="fa fa-times"></i>
-                </button>
-            </div>
-
-            <p class="text-gray-600 mb-4">Valor: <span id="modal-gift-value" class="font-bold text-primary text-lg"></span></p>
-
-            <!-- QR Code -->
-            <div class="flex justify-center mb-4">
-                <img id="modal-qr-code" src="" alt="QR Code PIX" class="w-48 h-48 object-contain rounded-lg shadow">
-            </div>
-
-            <!-- CHAVE PIX PRINCIPAL -->
-            <div class="mb-3 p-2 bg-gray-50 rounded-lg border border-gray-200">
-                <p class="text-xs text-gray-500 mb-1">Chave PIX:</p>
-                <div class="flex items-center justify-center gap-2">
-                    <span id="pix-copia-cola" class="font-mono text-sm font-medium text-gray-800 break-all"></span>
-                    <button onclick="copyPixKey()" class="text-blue-600 hover:text-blue-800 text-lg" title="Copiar chave">📋</button>
-                </div>
-            </div>
-
-            <!-- ✅ CHAVE ALTERNATIVA ABAIXO DO QR CODE (EXATO COMO PEDIU) -->
-            <div id="area-chave-alternativa" class="p-2 bg-pink-50 rounded-lg border border-pink-100">
-                <p class="text-xs text-gray-600 mb-1">Chave Alternativa:</p>
-                <div class="flex items-center justify-center gap-2">
-                    <span id="pix-alternativa" class="font-mono text-sm font-medium text-gray-800 break-all"></span>
-                    <button onclick="copiarChaveAlternativa()" class="text-green-600 hover:text-green-800 text-lg" title="Copiar chave alternativa">📋</button>
-                </div>
-            </div>
-
-            <!-- Dados da Reserva -->
-            <div class="mt-5 text-left space-y-2 bg-pink-50 p-3 rounded-lg">
-                <p class="text-sm"><strong>Reservado por:</strong> <span id="modalReservadoPor" class="text-gray-700"></span></p>
-                <p class="text-sm"><strong>Recado:</strong> <span id="modalMensagemRecado" class="text-gray-700 italic"></span></p>
-            </div>
-
-            <!-- Botões de Ação -->
-            <div id="botoes-acao-pix" class="mt-6 flex flex-col gap-2">
-                <button onclick="confirmarCompra()" class="bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-semibold transition">
-                    ✅ Confirmar Compra
-                </button>
-                <button onclick="cancelarReserva()" class="bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg font-semibold transition">
-                    ❌ Cancelar Reserva
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Reserva -->
-    <div id="reserva-modal" class="hidden modal-overlay">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
-            <div class="flex justify-between items-center mb-5">
-                <h3 class="text-xl font-bold text-gray-800">Reservar Item</h3>
-                <button onclick="closeModal('reserva-modal')" class="text-gray-500 hover:text-gray-800 text-xl">
-                    <i class="fa fa-times"></i>
-                </button>
-            </div>
-
-            <p class="mb-4 text-gray-600">Item: <strong id="reserva-nome-item"></strong></p>
-
-            <form onsubmit="confirmarReserva(event)" class="space-y-4">
-                <input type="hidden" id="reserva-id">
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Seu nome</label>
-                    <input type="text" id="reserva-nome" required class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100" readonly>
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Deixe um recado (opcional)</label>
-                    <textarea id="reserva-mensagem" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg" placeholder="Ex: Espero que goste! 😊"></textarea>
-                </div>
-
-                <button type="submit" class="w-full bg-primary hover:bg-dark text-white py-2 rounded-lg font-semibold transition">
-                    Confirmar Reserva
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal Lista de Comprados -->
-    <div id="lista-compras-modal" class="hidden modal-overlay">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center mb-5">
-                <h3 class="text-xl font-bold text-gray-800">📋 Lista de Itens Comprados/Reservados</h3>
-                <button onclick="closeModal('lista-compras-modal')" class="text-gray-500 hover:text-gray-800 text-xl">
-                    <i class="fa fa-times"></i>
-                </button>
-            </div>
-
-            <div id="lista-compras-conteudo" class="space-y-3">
-                <!-- Conteúdo carregado via JS -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Logs -->
-    <div id="logs-modal" class="hidden modal-overlay">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center mb-5">
-                <h3 class="text-xl font-bold text-gray-800">📜 Histórico de Alterações</h3>
-                <button onclick="closeModal('logs-modal')" class="text-gray-500 hover:text-gray-800 text-xl">
-                    <i class="fa fa-times"></i>
-                </button>
-            </div>
-
-            <div id="logs-conteudo" class="space-y-2 text-sm">
-                <!-- Conteúdo carregado via JS -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Configurações -->
-    <div id="settings-modal" class="hidden modal-overlay">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center mb-5">
-                <h3 class="text-xl font-bold text-gray-800">⚙️ Configurações do Sistema</h3>
-                <button onclick="closeModal('settings-modal')" class="text-gray-500 hover:text-gray-800 text-xl">
-                    <i class="fa fa-times"></i>
-                </button>
-            </div>
-
-            <form onsubmit="saveSettings(event)" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Título da Tela de Login</label>
-                    <input type="text" id="cfg-login-title" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Subtítulo da Login</label>
-                    <input type="text" id="cfg-login-subtitle" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Título Principal</label>
-                    <input type="text" id="cfg-main-title" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Texto de Boas-vindas</label>
-                    <textarea id="cfg-welcome-text" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg"></textarea>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Imagem de Fundo (URL)</label>
-                    <input type="url" id="cfg-bg-image" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Texto do Rodapé</label>
-                    <input type="text" id="cfg-footer-text" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
-                </div>
-
-                <button type="submit" class="w-full bg-primary hover:bg-dark text-white py-2 rounded-lg">Salvar Configurações</button>
-            </form>
-        </div>
-    </div>
-
-
-    <!-- Importação dos Scripts -->
-    <script type="module" src="firebase.js"></script>
-    <script type="module" src="app.js"></script>
-
-    <!-- FUNÇÃO COPIAR CHAVE ALTERNATIVA -->
-    <script>
-        function copiarChaveAlternativa() {
-            const texto = document.getElementById('pix-alternativa').textContent;
-            if(texto && texto.trim() !== "") {
-                navigator.clipboard.writeText(texto)
-                    .then(() => alert("✅ Chave alternativa copiada!"))
-                    .catch(() => alert("❌ Erro ao copiar, copie manualmente."));
-            } else {
-                alert("⚠️ Nenhuma chave alternativa cadastrada.");
-            }
-        }
-    </script>
-</body>
-</html>
+            <h3 class="font-bold text-lg">${item.name}</h3>
+            <p class="text-pink-600 font-bold text-xl my-2">${item.price}</p>
+            <button onclick="${item.reservadoPor?`openPixModal('${item.id}')`:`abrirReserva('${item.id}','${item.name.replace(/'/g, "\\'")}')`}" 
+                class="w-full mt-2 py-2 rounded-lg font-semibold ${item.reservadoPor?'bg-gray-500/90 text-white':'bg-pink-500/90 hover:bg-pink-600 text-white'}">
+                ${item.reservadoPor?'Ver PIX/Recado':'Escolher este'}
+            </button>
+        </div>`).join('');
+}
