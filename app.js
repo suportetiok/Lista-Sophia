@@ -1,7 +1,7 @@
 import { db, auth, providerGoogle, ref, onValue, set, update, push, remove, get, signInWithEmailAndPassword, signInWithPopup, signOut, onAuthStateChanged } from './firebase.js';
 
-// ✅ SEU UID EXATO - NÃO MUDE ISSO
-const UID_ADMIN = "lWScb6ixfRQRNBkPloMdKcGFHzS2";
+// ✅ SEU UID QUE VOCÊ ME PASSOU - NÃO MUDE AQUI
+const UID_ADMIN_CORRETO = "lWScb6ixfRQRNBkPloMdKcGFHzS2";
 
 // Variáveis Globais
 let isAdmin = false;
@@ -87,16 +87,18 @@ window.handleAdminLogin = async function(event) {
     try {
         const resultado = await signInWithEmailAndPassword(auth, email, senha);
         
-        // ✅ VERIFICAÇÃO PRINCIPAL: SE O UID FOR O SEU = ADMIN
-        if (resultado.user.uid === UID_ADMIN) {
+        // 🔍 MOSTRA O UID REAL LOGADO - PARA CONFIRMAR
+        alert("🔍 SEU UID LOGADO: " + resultado.user.uid + "\n✅ UID ADMIN CADASTRADO: " + UID_ADMIN_CORRETO);
+
+        // ✅ VERIFICAÇÃO EXATA
+        if (resultado.user.uid === UID_ADMIN_CORRETO) {
             isAdmin = true;
             usuarioAtualNome = "Administrador";
             mostrarBotoesAdmin();
-            alert("✅ Logado como ADMIN (E-mail/Senha)");
+            alert("✅ LOGADO COMO ADMINISTRADOR!");
         } else {
             isAdmin = false;
-            alert("❌ Você não tem permissão de administrador");
-            return;
+            alert("❌ NÃO É ADMIN - UID DIFERENTE");
         }
 
         screenAdminLogin.classList.add('hidden');
@@ -114,12 +116,15 @@ window.loginComGoogle = async function() {
     try {
         const resultado = await signInWithPopup(auth, providerGoogle);
 
-        // ✅ MESMA REGRA PARA GOOGLE: SÓ SEU UID É ADMIN
-        if (resultado.user.uid === UID_ADMIN) {
+        // 🔍 MOSTRA O UID REAL LOGADO - PARA CONFIRMAR
+        alert("🔍 SEU UID LOGADO: " + resultado.user.uid + "\n✅ UID ADMIN CADASTRADO: " + UID_ADMIN_CORRETO);
+
+        // ✅ VERIFICAÇÃO EXATA
+        if (resultado.user.uid === UID_ADMIN_CORRETO) {
             isAdmin = true;
             usuarioAtualNome = resultado.user.displayName || "Administrador";
             mostrarBotoesAdmin();
-            alert("✅ Logado como ADMIN (Google)");
+            alert("✅ LOGADO COM GOOGLE COMO ADMIN!");
         } else {
             isAdmin = false;
             usuarioAtualNome = resultado.user.displayName || "Usuário";
@@ -405,7 +410,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if(usuarioAtualNome) atualizarSaudacao();
     });
 
-    // ✅ CARREGA TODOS OS ITENS - CORRIGIDO DEFINITIVAMENTE
+    // ✅ CARREGA TODOS OS ITENS - CORRIGIDO
     onValue(ref(db, 'gifts'), snap => {
         giftsData = [];
         snap.forEach(childSnapshot => {
