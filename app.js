@@ -1,10 +1,7 @@
 import { db, auth, providerGoogle, ref, onValue, set, update, push, remove, get, signInWithEmailAndPassword, signInWithPopup, signOut, onAuthStateChanged } from './firebase.js';
 
-// ✅ DEFINA AQUI QUAIS EMAILS SÃO ADMINISTRADORES (COLOQUE SEUS EMAILS)
-const EMAILS_ADMIN = [
-    "seuemail@gmail.com",       // <-- COLOQUE SEU EMAIL AQUI
-    "admin@seudominio.com.br"   // <-- OUTRO EMAIL SE QUISER
-];
+// ✅ SEU UID AQUI - AGORA É A ÚNICA FORMA DE SER ADMIN
+const UID_ADMIN = "lWScb6ixfRQRNBkPloMdKcGFHzS2";
 
 // Variáveis Globais
 let isAdmin = false;
@@ -87,41 +84,43 @@ window.handleAdminLogin = async function(event) {
     const email = document.getElementById('admin-email').value.trim().toLowerCase();
     const senha = document.getElementById('admin-password').value;
 
-    // ✅ VERIFICA SE O EMAIL ESTÁ NA LISTA DE ADMINS
-    if (!EMAILS_ADMIN.includes(email)) {
-        alert("❌ Acesso negado! Este e-mail não tem permissão de administrador.");
-        return;
-    }
-
     try {
-        await signInWithEmailAndPassword(auth, email, senha);
-        isAdmin = true;
-        usuarioAtualNome = "Administrador";
+        const resultado = await signInWithEmailAndPassword(auth, email, senha);
+        
+        // ✅ VERIFICA SE O UID É O SEU ADMIN
+        if (resultado.user.uid === UID_ADMIN) {
+            isAdmin = true;
+            usuarioAtualNome = "Administrador";
+            mostrarBotoesAdmin();
+            alert("✅ Logado como Administrador!");
+        } else {
+            isAdmin = false;
+            alert("❌ Acesso negado! Você não é administrador.");
+            return;
+        }
+
         screenAdminLogin.classList.add('hidden');
         screenDashboard.classList.remove('hidden');
-        mostrarBotoesAdmin();
         atualizarSaudacao();
         renderGifts();
-        alert("✅ Logado como Administrador!");
+        
     } catch (erro) {
         console.error("ERRO LOGIN EMAIL:", erro);
-        alert("❌ Erro: Verifique e-mail, senha ou regras do banco.");
+        alert("❌ Erro: Verifique e-mail e senha.");
     }
 };
 
 window.loginComGoogle = async function() {
     try {
         const resultado = await signInWithPopup(auth, providerGoogle);
-        const emailUsuario = resultado.user.email.trim().toLowerCase();
 
-        // ✅ REGRA PRINCIPAL: SÓ É ADMIN SE ESTIVER NA LISTA DE EMAILS PERMITIDOS
-        if (EMAILS_ADMIN.includes(emailUsuario)) {
+        // ✅ VERIFICA PELO UID, NÃO POR EMAIL
+        if (resultado.user.uid === UID_ADMIN) {
             isAdmin = true;
             usuarioAtualNome = resultado.user.displayName || "Administrador";
             mostrarBotoesAdmin();
             alert("✅ Logado com Google como ADMINISTRADOR!");
         } else {
-            // Qualquer outro email é apenas USUÁRIO COMUM
             isAdmin = false;
             usuarioAtualNome = resultado.user.displayName || "Usuário";
             alert("✅ Acesso liberado como usuário comum.");
@@ -242,7 +241,7 @@ window.confirmarReserva = async function(event) {
         closeModal('reserva-modal');
         openPixModal(id);
     } catch (erro) {
-        alert("❌ Erro ao reservar: " + erro.message + " | Se persistir, contate o administrador.");
+        alert("❌ Erro ao reservar: " + erro.message);
     }
 };
 
@@ -405,9 +404,15 @@ document.addEventListener("DOMContentLoaded", () => {
         if(usuarioAtualNome) atualizarSaudacao();
     });
 
+    // ✅ CORREÇÃO AQUI: AGORA CARREGA TODOS OS ITENS, SEM BLOQUEIO
     onValue(ref(db, 'gifts'), snap => {
         giftsData = [];
-        snap.forEach(c => giftsData.push({id:c.key, ...c.val()}));
+        snap.forEach(child => {
+            giftsData.push({
+                id: child.key,
+                ...child.val()
+            });
+        });
         renderGifts();
     });
 });
