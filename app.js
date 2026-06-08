@@ -1,6 +1,6 @@
 import { db, auth, providerGoogle, ref, onValue, set, update, push, remove, get, signInWithEmailAndPassword, signInWithPopup, signOut, onAuthStateChanged } from './firebase.js';
 
-// ✅ SEU UID AQUI - AGORA É A ÚNICA FORMA DE SER ADMIN
+// ✅ SEU UID EXATO - NÃO MUDE ISSO
 const UID_ADMIN = "lWScb6ixfRQRNBkPloMdKcGFHzS2";
 
 // Variáveis Globais
@@ -81,21 +81,21 @@ window.hideAdminLogin = function() {
 
 window.handleAdminLogin = async function(event) {
     event.preventDefault();
-    const email = document.getElementById('admin-email').value.trim().toLowerCase();
+    const email = document.getElementById('admin-email').value.trim();
     const senha = document.getElementById('admin-password').value;
 
     try {
         const resultado = await signInWithEmailAndPassword(auth, email, senha);
         
-        // ✅ VERIFICA SE O UID É O SEU ADMIN
+        // ✅ VERIFICAÇÃO PRINCIPAL: SE O UID FOR O SEU = ADMIN
         if (resultado.user.uid === UID_ADMIN) {
             isAdmin = true;
             usuarioAtualNome = "Administrador";
             mostrarBotoesAdmin();
-            alert("✅ Logado como Administrador!");
+            alert("✅ Logado como ADMIN (E-mail/Senha)");
         } else {
             isAdmin = false;
-            alert("❌ Acesso negado! Você não é administrador.");
+            alert("❌ Você não tem permissão de administrador");
             return;
         }
 
@@ -105,8 +105,8 @@ window.handleAdminLogin = async function(event) {
         renderGifts();
         
     } catch (erro) {
-        console.error("ERRO LOGIN EMAIL:", erro);
-        alert("❌ Erro: Verifique e-mail e senha.");
+        console.error("ERRO LOGIN:", erro);
+        alert("❌ Erro: " + erro.message);
     }
 };
 
@@ -114,16 +114,16 @@ window.loginComGoogle = async function() {
     try {
         const resultado = await signInWithPopup(auth, providerGoogle);
 
-        // ✅ VERIFICA PELO UID, NÃO POR EMAIL
+        // ✅ MESMA REGRA PARA GOOGLE: SÓ SEU UID É ADMIN
         if (resultado.user.uid === UID_ADMIN) {
             isAdmin = true;
             usuarioAtualNome = resultado.user.displayName || "Administrador";
             mostrarBotoesAdmin();
-            alert("✅ Logado com Google como ADMINISTRADOR!");
+            alert("✅ Logado como ADMIN (Google)");
         } else {
             isAdmin = false;
             usuarioAtualNome = resultado.user.displayName || "Usuário";
-            alert("✅ Acesso liberado como usuário comum.");
+            alert("✅ Acesso liberado como usuário comum");
         }
 
         screenAdminLogin.classList.add('hidden');
@@ -133,7 +133,7 @@ window.loginComGoogle = async function() {
 
     } catch (erro) {
         console.error("ERRO GOOGLE:", erro);
-        alert("❌ Erro ao logar com Google: " + erro.message);
+        alert("❌ Erro: " + erro.message);
     }
 };
 
@@ -237,7 +237,7 @@ window.confirmarReserva = async function(event) {
             status: 'reservado'
         });
         registrarLog("RESERVA", `Item reservado por ${nomePessoa}`);
-        alert("✅ Reserva confirmada! Agora é só pagar o PIX.");
+        alert("✅ Reserva confirmada!");
         closeModal('reserva-modal');
         openPixModal(id);
     } catch (erro) {
@@ -247,12 +247,12 @@ window.confirmarReserva = async function(event) {
 
 window.confirmarCompra = async function() {
     if(!itemAtualId) return;
-    if(!confirm("Tem certeza que deseja CONFIRMAR a compra? O item será marcado como pago.")) return;
+    if(!confirm("Tem certeza que deseja CONFIRMAR a compra?")) return;
     try {
         const itemRef = ref(db, `gifts/${itemAtualId}`);
         await update(itemRef, { status: 'pago' });
-        registrarLog("VENDA", `Compra confirmada para o item ID: ${itemAtualId}`);
-        alert("✅ Compra confirmada com sucesso!");
+        registrarLog("VENDA", `Compra confirmada ID: ${itemAtualId}`);
+        alert("✅ Compra confirmada!");
         closeModal('pix-modal');
     } catch (erro) {
         alert("❌ Erro: " + erro.message);
@@ -261,7 +261,7 @@ window.confirmarCompra = async function() {
 
 window.cancelarReserva = async function() {
     if(!itemAtualId) return;
-    if(!confirm("Tem certeza que deseja CANCELAR esta reserva? O item voltará a ficar disponível.")) return;
+    if(!confirm("Tem certeza que deseja CANCELAR esta reserva?")) return;
     try {
         const itemRef = ref(db, `gifts/${itemAtualId}`);
         await update(itemRef, {
@@ -269,8 +269,8 @@ window.cancelarReserva = async function() {
             mensagem: null,
             status: null
         });
-        registrarLog("CANCELAMENTO", `Reserva cancelada. Item disponível novamente.`);
-        alert("✅ Reserva cancelada! Item liberado.");
+        registrarLog("CANCELAMENTO", `Reserva cancelada`);
+        alert("✅ Reserva cancelada!");
         closeModal('pix-modal');
     } catch (erro) {
         alert("❌ Erro: " + erro.message);
@@ -279,7 +279,7 @@ window.cancelarReserva = async function() {
 
 window.reativarItem = async function(giftId) {
     if(!isAdmin) { alert("❌ Acesso restrito!"); return; }
-    if(!confirm("Deseja reativar este item? Ele aparecerá como disponível na lista.")) return;
+    if(!confirm("Deseja reativar este item?")) return;
     try {
         const itemRef = ref(db, `gifts/${giftId}`);
         await update(itemRef, {
@@ -287,8 +287,8 @@ window.reativarItem = async function(giftId) {
             mensagem: null,
             status: null
         });
-        registrarLog("REATIVACAO", `Item reativado e disponível para reserva.`);
-        alert("✅ Item reativado com sucesso!");
+        registrarLog("REATIVACAO", `Item reativado`);
+        alert("✅ Item reativado!");
         renderGifts();
     } catch (erro) {
         alert("❌ Erro: " + erro.message);
@@ -299,7 +299,7 @@ window.abrirListaCompras = async function() {
     if(!isAdmin) { alert("❌ Acesso restrito!"); return; }
     const conteudo = document.getElementById('lista-compras-conteudo');
     const comprados = giftsData.filter(g => g.reservadoPor);
-    conteudo.innerHTML = comprados.length === 0 ? "<p class='text-center text-gray-500'>Nenhum item comprado/reservado</p>" :
+    conteudo.innerHTML = comprados.length === 0 ? "<p class='text-center text-gray-500'>Nenhum item comprado</p>" :
         comprados.map(i => `
         <div class="p-3 border rounded bg-white">
             <p class="font-bold">${i.name} - ${i.price}</p>
@@ -386,7 +386,7 @@ window.saveSettings = async function(e) {
     };
     try {
         await update(ref(db, 'configuracoes'), dados);
-        registrarLog("CONFIG", "Configurações do sistema alteradas");
+        registrarLog("CONFIG", "Configurações alteradas");
         closeModal('settings-modal');
     } catch (erro) {
         alert("❌ Erro: " + erro.message);
@@ -394,6 +394,7 @@ window.saveSettings = async function(e) {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
+    // Carrega configurações
     onValue(ref(db, 'configuracoes'), snap => {
         siteConfig = snap.val() || {};
         document.getElementById('login-title').textContent = siteConfig.loginTitle || "Lista de Presentes";
@@ -404,13 +405,13 @@ document.addEventListener("DOMContentLoaded", () => {
         if(usuarioAtualNome) atualizarSaudacao();
     });
 
-    // ✅ CORREÇÃO AQUI: AGORA CARREGA TODOS OS ITENS, SEM BLOQUEIO
+    // ✅ CARREGA TODOS OS ITENS - CORRIGIDO DEFINITIVAMENTE
     onValue(ref(db, 'gifts'), snap => {
         giftsData = [];
-        snap.forEach(child => {
+        snap.forEach(childSnapshot => {
             giftsData.push({
-                id: child.key,
-                ...child.val()
+                id: childSnapshot.key,
+                ...childSnapshot.val()
             });
         });
         renderGifts();
