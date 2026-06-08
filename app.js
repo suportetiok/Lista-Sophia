@@ -1,5 +1,11 @@
 import { db, auth, providerGoogle, ref, onValue, set, update, push, remove, get, signInWithEmailAndPassword, signInWithPopup, signOut, onAuthStateChanged } from './firebase.js';
 
+// ✅ DEFINA AQUI QUAIS EMAILS SÃO ADMINISTRADORES (COLOQUE SEUS EMAILS)
+const EMAILS_ADMIN = [
+    "seuemail@gmail.com",       // <-- COLOQUE SEU EMAIL AQUI
+    "admin@seudominio.com.br"   // <-- OUTRO EMAIL SE QUISER
+];
+
 // Variáveis Globais
 let isAdmin = false;
 let giftsData = [];
@@ -78,8 +84,15 @@ window.hideAdminLogin = function() {
 
 window.handleAdminLogin = async function(event) {
     event.preventDefault();
-    const email = document.getElementById('admin-email').value;
+    const email = document.getElementById('admin-email').value.trim().toLowerCase();
     const senha = document.getElementById('admin-password').value;
+
+    // ✅ VERIFICA SE O EMAIL ESTÁ NA LISTA DE ADMINS
+    if (!EMAILS_ADMIN.includes(email)) {
+        alert("❌ Acesso negado! Este e-mail não tem permissão de administrador.");
+        return;
+    }
+
     try {
         await signInWithEmailAndPassword(auth, email, senha);
         isAdmin = true;
@@ -99,21 +112,26 @@ window.handleAdminLogin = async function(event) {
 window.loginComGoogle = async function() {
     try {
         const resultado = await signInWithPopup(auth, providerGoogle);
-        // ✅ REGRA: SÓ É ADMIN SE ESTIVER NA LISTA
-        const emailsPermitidos = ["seuemail@gmail.com", "admin@seudominio.com.br"];
-        if(emailsPermitidos.includes(resultado.user.email)) {
+        const emailUsuario = resultado.user.email.trim().toLowerCase();
+
+        // ✅ REGRA PRINCIPAL: SÓ É ADMIN SE ESTIVER NA LISTA DE EMAILS PERMITIDOS
+        if (EMAILS_ADMIN.includes(emailUsuario)) {
             isAdmin = true;
             usuarioAtualNome = resultado.user.displayName || "Administrador";
             mostrarBotoesAdmin();
+            alert("✅ Logado com Google como ADMINISTRADOR!");
         } else {
+            // Qualquer outro email é apenas USUÁRIO COMUM
             isAdmin = false;
             usuarioAtualNome = resultado.user.displayName || "Usuário";
             alert("✅ Acesso liberado como usuário comum.");
         }
+
         screenAdminLogin.classList.add('hidden');
         screenDashboard.classList.remove('hidden');
         atualizarSaudacao();
         renderGifts();
+
     } catch (erro) {
         console.error("ERRO GOOGLE:", erro);
         alert("❌ Erro ao logar com Google: " + erro.message);
