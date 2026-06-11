@@ -1,7 +1,10 @@
-import { db, auth, providerGoogle, ref, onValue, set, update, push, remove, get, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, sendPasswordResetEmail, signOut, onAuthStateChanged } from './firebase.js';
+import { db, auth, providerGoogle, ref, onValue, set, update, push, remove, get, signInWithEmailAndPassword, signInWithPopup, signOut, onAuthStateChanged } from './firebase.js';
 
-// ✅ SEU UID PRINCIPAL (SEM ELE NINGUÉM CRIA NINGUÉM)
-const UID_MESTRE = "lWScb6ixfRQRNBkPloMdKcGFHzS2";
+// ✅ DEFINA AQUI QUAIS EMAILS SÃO ADMINISTRADORES (COLOQUE SEUS EMAILS)
+const EMAILS_ADMIN = [
+    "seuemail@gmail.com",       // <-- COLOQUE SEU EMAIL AQUI
+    "admin@seudominio.com.br"   // <-- OUTRO EMAIL SE QUISER
+];
 
 // Variáveis Globais
 let isAdmin = false;
@@ -22,7 +25,6 @@ const btnNewItem = document.getElementById('btn-new-item');
 const btnSettings = document.getElementById('btn-settings');
 const btnListaCompras = document.getElementById('btn-lista-compras');
 const btnLogs = document.getElementById('btn-logs');
-const btnAdicionarAdmin = document.getElementById('btn-adicionar-admin'); // NOVO BOTÃO
 
 // Elementos Modais
 const editModal = document.getElementById('edit-modal');
@@ -57,15 +59,6 @@ const cfgWelcomeText = document.getElementById('cfg-welcome-text');
 const cfgBgImage = document.getElementById('cfg-bg-image');
 const cfgFooterText = document.getElementById('cfg-footer-text');
 
-// 🆕 MODAL ADICIONAR ADMIN
-const adminModal = document.getElementById('admin-modal');
-const novoAdminEmail = document.getElementById('novo-admin-email');
-const novoAdminSenha = document.getElementById('novo-admin-senha');
-
-// 🆕 MODAL RECUPERAR SENHA
-const recuperarSenhaModal = document.getElementById('recuperar-senha-modal');
-const emailRecuperacao = document.getElementById('email-recuperacao');
-
 // FUNÇÕES GLOBAIS
 window.closeModal = function(modalId) {
     const modal = document.getElementById(modalId);
@@ -89,69 +82,49 @@ window.hideAdminLogin = function() {
     screenLogin.classList.remove('hidden');
 };
 
-// 🆕 RECUPERAR SENHA
-window.abrirRecuperarSenha = function() {
-    recuperarSenhaModal.classList.remove('hidden');
-};
-
-window.enviarRecuperacao = async function() {
-    const email = emailRecuperacao.value.trim();
-    if(!email) return alert("Digite o e-mail!");
-    try {
-        await sendPasswordResetEmail(auth, email);
-        alert("✅ E-mail de recuperação enviado! Verifique sua caixa de entrada.");
-        closeModal('recuperar-senha-modal');
-    } catch (erro) {
-        alert("❌ Erro: " + erro.message);
-    }
-};
-
 window.handleAdminLogin = async function(event) {
     event.preventDefault();
-    const email = document.getElementById('admin-email').value.trim();
+    const email = document.getElementById('admin-email').value.trim().toLowerCase();
     const senha = document.getElementById('admin-password').value;
 
-    try {
-        const resultado = await signInWithEmailAndPassword(auth, email, senha);
-        
-        // ✅ VERIFICA SE É ADMIN NO BANCO
-        const snapAdmin = await get(ref(db, `admins/${resultado.user.uid}`));
-        if (snapAdmin.exists()) {
-            isAdmin = true;
-            usuarioAtualNome = "Administrador";
-            mostrarBotoesAdmin();
-            alert("✅ LOGADO COMO ADMINISTRADOR!");
-        } else {
-            isAdmin = false;
-            alert("❌ Acesso negado! Você não é administrador.");
-            return;
-        }
+    // ✅ VERIFICA SE O EMAIL ESTÁ NA LISTA DE ADMINS
+    if (!EMAILS_ADMIN.includes(email)) {
+        alert("❌ Acesso negado! Este e-mail não tem permissão de administrador.");
+        return;
+    }
 
+    try {
+        await signInWithEmailAndPassword(auth, email, senha);
+        isAdmin = true;
+        usuarioAtualNome = "Administrador";
         screenAdminLogin.classList.add('hidden');
         screenDashboard.classList.remove('hidden');
+        mostrarBotoesAdmin();
         atualizarSaudacao();
         renderGifts();
-        
+        alert("✅ Logado como Administrador!");
     } catch (erro) {
-        console.error("ERRO LOGIN:", erro);
-        alert("❌ Erro: Verifique e-mail e senha.");
+        console.error("ERRO LOGIN EMAIL:", erro);
+        alert("❌ Erro: Verifique e-mail, senha ou regras do banco.");
     }
 };
 
 window.loginComGoogle = async function() {
     try {
         const resultado = await signInWithPopup(auth, providerGoogle);
+        const emailUsuario = resultado.user.email.trim().toLowerCase();
 
-        // ✅ VERIFICA SE É ADMIN NO BANCO
-        const snapAdmin = await get(ref(db, `admins/${resultado.user.uid}`));
-        if (snapAdmin.exists()) {
+        // ✅ REGRA PRINCIPAL: SÓ É ADMIN SE ESTIVER NA LISTA DE EMAILS PERMITIDOS
+        if (EMAILS_ADMIN.includes(emailUsuario)) {
             isAdmin = true;
             usuarioAtualNome = resultado.user.displayName || "Administrador";
             mostrarBotoesAdmin();
-            alert("✅ LOGADO COM GOOGLE COMO ADMIN!");
+            alert("✅ Logado com Google como ADMINISTRADOR!");
         } else {
+            // Qualquer outro email é apenas USUÁRIO COMUM
             isAdmin = false;
             usuarioAtualNome = resultado.user.displayName || "Usuário";
+            alert("✅ Acesso liberado como usuário comum.");
         }
 
         screenAdminLogin.classList.add('hidden');
@@ -161,7 +134,7 @@ window.loginComGoogle = async function() {
 
     } catch (erro) {
         console.error("ERRO GOOGLE:", erro);
-        alert("❌ Erro: " + erro.message);
+        alert("❌ Erro ao logar com Google: " + erro.message);
     }
 };
 
@@ -178,7 +151,6 @@ window.handleLogin = function(event) {
         btnSettings.classList.add('hidden');
         btnListaCompras.classList.add('hidden');
         btnLogs.classList.add('hidden');
-        btnAdicionarAdmin.classList.add('hidden');
         renderGifts();
     }
 };
@@ -193,7 +165,7 @@ window.handleLogout = async function() {
 };
 
 window.openNewItemModal = function() {
-    if(!editModal || !isAdmin) { alert("❌ Acesso restrito!"); return; }
+    if(!editModal || !isAdmin) { alert("❌ Acesso restrito ao administrador!"); return; }
     document.getElementById('edit-modal-title').textContent = "Adicionar Novo Presente";
     editId.value = "";
     editName.value = "";
@@ -206,7 +178,7 @@ window.openNewItemModal = function() {
 };
 
 window.openEditModal = function(giftId) {
-    if(!isAdmin) { alert("❌ Acesso restrito!"); return; }
+    if(!isAdmin) { alert("❌ Acesso restrito ao administrador!"); return; }
     const gift = giftsData.find(g => g.id === giftId);
     if(gift) {
         document.getElementById('edit-modal-title').textContent = "Editar Presente";
@@ -266,22 +238,22 @@ window.confirmarReserva = async function(event) {
             status: 'reservado'
         });
         registrarLog("RESERVA", `Item reservado por ${nomePessoa}`);
-        alert("✅ Reserva confirmada!");
+        alert("✅ Reserva confirmada! Agora é só pagar o PIX.");
         closeModal('reserva-modal');
         openPixModal(id);
     } catch (erro) {
-        alert("❌ Erro ao reservar: " + erro.message);
+        alert("❌ Erro ao reservar: " + erro.message + " | Se persistir, contate o administrador.");
     }
 };
 
 window.confirmarCompra = async function() {
     if(!itemAtualId) return;
-    if(!confirm("Tem certeza que deseja CONFIRMAR a compra?")) return;
+    if(!confirm("Tem certeza que deseja CONFIRMAR a compra? O item será marcado como pago.")) return;
     try {
         const itemRef = ref(db, `gifts/${itemAtualId}`);
         await update(itemRef, { status: 'pago' });
-        registrarLog("VENDA", `Compra confirmada ID: ${itemAtualId}`);
-        alert("✅ Compra confirmada!");
+        registrarLog("VENDA", `Compra confirmada para o item ID: ${itemAtualId}`);
+        alert("✅ Compra confirmada com sucesso!");
         closeModal('pix-modal');
     } catch (erro) {
         alert("❌ Erro: " + erro.message);
@@ -290,7 +262,7 @@ window.confirmarCompra = async function() {
 
 window.cancelarReserva = async function() {
     if(!itemAtualId) return;
-    if(!confirm("Tem certeza que deseja CANCELAR esta reserva?")) return;
+    if(!confirm("Tem certeza que deseja CANCELAR esta reserva? O item voltará a ficar disponível.")) return;
     try {
         const itemRef = ref(db, `gifts/${itemAtualId}`);
         await update(itemRef, {
@@ -298,8 +270,8 @@ window.cancelarReserva = async function() {
             mensagem: null,
             status: null
         });
-        registrarLog("CANCELAMENTO", `Reserva cancelada`);
-        alert("✅ Reserva cancelada!");
+        registrarLog("CANCELAMENTO", `Reserva cancelada. Item disponível novamente.`);
+        alert("✅ Reserva cancelada! Item liberado.");
         closeModal('pix-modal');
     } catch (erro) {
         alert("❌ Erro: " + erro.message);
@@ -308,7 +280,7 @@ window.cancelarReserva = async function() {
 
 window.reativarItem = async function(giftId) {
     if(!isAdmin) { alert("❌ Acesso restrito!"); return; }
-    if(!confirm("Deseja reativar este item?")) return;
+    if(!confirm("Deseja reativar este item? Ele aparecerá como disponível na lista.")) return;
     try {
         const itemRef = ref(db, `gifts/${giftId}`);
         await update(itemRef, {
@@ -316,8 +288,8 @@ window.reativarItem = async function(giftId) {
             mensagem: null,
             status: null
         });
-        registrarLog("REATIVACAO", `Item reativado`);
-        alert("✅ Item reativado!");
+        registrarLog("REATIVACAO", `Item reativado e disponível para reserva.`);
+        alert("✅ Item reativado com sucesso!");
         renderGifts();
     } catch (erro) {
         alert("❌ Erro: " + erro.message);
@@ -328,7 +300,7 @@ window.abrirListaCompras = async function() {
     if(!isAdmin) { alert("❌ Acesso restrito!"); return; }
     const conteudo = document.getElementById('lista-compras-conteudo');
     const comprados = giftsData.filter(g => g.reservadoPor);
-    conteudo.innerHTML = comprados.length === 0 ? "<p class='text-center text-gray-500'>Nenhum item comprado</p>" :
+    conteudo.innerHTML = comprados.length === 0 ? "<p class='text-center text-gray-500'>Nenhum item comprado/reservado</p>" :
         comprados.map(i => `
         <div class="p-3 border rounded bg-white">
             <p class="font-bold">${i.name} - ${i.price}</p>
@@ -363,36 +335,6 @@ window.openSettingsModal = function() {
     cfgBgImage.value = siteConfig.backgroundImage || "";
     cfgFooterText.value = siteConfig.footerText || "";
     settingsModal.classList.remove('hidden');
-};
-
-// 🆕 ADICIONAR NOVO ADMIN
-window.abrirAdicionarAdmin = function() {
-    if(!isAdmin || auth.currentUser.uid !== UID_MESTRE) { 
-        alert("❌ Apenas o administrador principal pode cadastrar novos!"); 
-        return; 
-    }
-    adminModal.classList.remove('hidden');
-};
-
-window.cadastrarNovoAdmin = async function(e) {
-    e.preventDefault();
-    const email = novoAdminEmail.value.trim();
-    const senha = novoAdminSenha.value;
-
-    try {
-        // Cria a conta no Firebase Auth
-        const usuarioCriado = await createUserWithEmailAndPassword(auth, email, senha);
-        // Cadastra como ADMIN no banco
-        await set(ref(db, `admins/${usuarioCriado.user.uid}`), true);
-        
-        alert("✅ Novo administrador cadastrado com sucesso!");
-        closeModal('admin-modal');
-        novoAdminEmail.value = "";
-        novoAdminSenha.value = "";
-
-    } catch (erro) {
-        alert("❌ Erro: " + erro.message);
-    }
 };
 
 window.saveItem = async function(e) {
@@ -445,7 +387,7 @@ window.saveSettings = async function(e) {
     };
     try {
         await update(ref(db, 'configuracoes'), dados);
-        registrarLog("CONFIG", "Configurações alteradas");
+        registrarLog("CONFIG", "Configurações do sistema alteradas");
         closeModal('settings-modal');
     } catch (erro) {
         alert("❌ Erro: " + erro.message);
@@ -453,7 +395,6 @@ window.saveSettings = async function(e) {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
-    // Carrega configurações
     onValue(ref(db, 'configuracoes'), snap => {
         siteConfig = snap.val() || {};
         document.getElementById('login-title').textContent = siteConfig.loginTitle || "Lista de Presentes";
@@ -464,15 +405,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if(usuarioAtualNome) atualizarSaudacao();
     });
 
-    // ✅ CARREGA TODOS OS ITENS
     onValue(ref(db, 'gifts'), snap => {
         giftsData = [];
-        snap.forEach(childSnapshot => {
-            giftsData.push({
-                id: childSnapshot.key,
-                ...childSnapshot.val()
-            });
-        });
+        snap.forEach(c => giftsData.push({id:c.key, ...c.val()}));
         renderGifts();
     });
 });
@@ -487,7 +422,6 @@ function mostrarBotoesAdmin() {
     btnSettings.classList.remove('hidden');
     btnListaCompras.classList.remove('hidden');
     btnLogs.classList.remove('hidden');
-    btnAdicionarAdmin.classList.remove('hidden'); // MOSTRA BOTÃO DE NOVO ADMIN
 }
 
 function registrarLog(tipo, descricao, itemId=null) {
