@@ -1,419 +1,339 @@
-// CONFIGURAÇÃO DO FIREBASE - COLE A SUA AQUI
-const firebaseConfig = {
-    apiKey: "SUA_API_KEY",
-    authDomain: "SEU_DOMINIO",
-    databaseURL: "https://lista-sophia-default-rtdb.firebaseio.com/",
-    projectId: "SEU_PROJETO",
-    storageBucket: "SEU_BUCKET",
-    messagingSenderId: "SEU_SENDER_ID",
-    appId: "SUA_APP_ID"
-};
-
-// Inicializa Firebase
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-const auth = firebase.auth();
-const providerGoogle = new firebase.auth.GoogleAuthProvider();
-
-// ✅ SEU UID ADMIN
-const MEU_UID = "lWScb6ixfRQRNBkPloMdKcGFHzS2";
-
-// Variáveis Globais
-let isAdmin = false;
-let giftsData = [];
-let siteConfig = {};
-let usuarioAtualNome = "";
-let itemAtualId = "";
-
-// ELEMENTOS
-const screenLogin = document.getElementById('screen-login');
-const screenAdminLogin = document.getElementById('screen-admin-login');
-const screenDashboard = document.getElementById('screen-dashboard');
-const giftsGrid = document.getElementById('gifts-grid');
-const welcomeText = document.getElementById('welcomeText');
-const footerText = document.getElementById('footer-text');
-const paginaPrincipal = document.getElementById('pagina-principal');
-const btnNewItem = document.getElementById('btn-new-item');
-const btnSettings = document.getElementById('btn-settings');
-const btnListaCompras = document.getElementById('btn-lista-compras');
-const btnLogs = document.getElementById('btn-logs');
-const btnAdicionarAdmin = document.getElementById('btn-adicionar-admin');
-
-// FUNÇÕES GLOBAIS
-window.closeModal = function(modalId) {
-    document.getElementById(modalId).classList.add('hidden');
-};
-
-window.copyPixKey = function() {
-    navigator.clipboard.writeText(document.getElementById('pix-copia-cola').textContent)
-    .then(() => alert("✅ Código copiado!"))
-    .catch(() => alert("❌ Erro ao copiar"));
-};
-
-window.showAdminLogin = function() {
-    screenLogin.classList.add('hidden');
-    screenAdminLogin.classList.remove('hidden');
-};
-
-window.hideAdminLogin = function() {
-    screenAdminLogin.classList.add('hidden');
-    screenLogin.classList.remove('hidden');
-};
-
-window.abrirRecuperarSenha = function() {
-    document.getElementById('recuperar-senha-modal').classList.remove('hidden');
-};
-
-window.enviarRecuperacao = function() {
-    const email = document.getElementById('email-recuperacao').value.trim();
-    if(!email) return alert("Digite o e-mail!");
-    auth.sendPasswordResetEmail(email)
-    .then(() => {
-        alert("✅ E-mail enviado! Verifique sua caixa de entrada.");
-        closeModal('recuperar-senha-modal');
-    })
-    .catch(err => alert("❌ Erro: " + err.message));
-};
-
-window.handleLogin = function(e) {
-    e.preventDefault();
-    const nome = document.getElementById('username').value.trim();
-    if(!nome) return alert("Digite seu nome!");
-    usuarioAtualNome = nome;
-    isAdmin = false;
-    atualizarSaudacao();
-    screenLogin.classList.add('hidden');
-    screenDashboard.classList.remove('hidden');
-    renderGifts();
-};
-
-window.handleAdminLogin = function(e) {
-    e.preventDefault();
-    const email = document.getElementById('admin-email').value.trim();
-    const senha = document.getElementById('admin-password').value;
-
-    auth.signInWithEmailAndPassword(email, senha)
-    .then(result => {
-        const uid = result.user.uid;
-        // DIAGNÓSTICO
-        alert(`🔍 UID LOGADO: ${uid}\nUID ADMIN: ${MEU_UID}\nIGUAIS? ${uid === MEU_UID ? 'SIM ✅' : 'NÃO ❌'}`);
-        
-        if(uid === MEU_UID) {
-            isAdmin = true;
-            usuarioAtualNome = "Administrador";
-            mostrarBotoesAdmin();
-            alert("✅ LOGADO COMO ADMIN!");
-        } else {
-            return db.ref(`admins/${uid}`).once('value').then(snap => {
-                if(snap.exists()) {
-                    isAdmin = true;
-                    usuarioAtualNome = "Administrador";
-                    mostrarBotoesAdmin();
-                    alert("✅ ADMIN CADASTRADO NO BANCO!");
-                } else {
-                    isAdmin = false;
-                    alert("❌ USUÁRIO COMUM");
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lista de Presentes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        pink: {
+                            50: '#fdf2f8',
+                            500: '#ec4899',
+                            600: '#db2777',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
                 }
-            });
+            }
         }
-
-        screenAdminLogin.classList.add('hidden');
-        screenDashboard.classList.remove('hidden');
-        atualizarSaudacao();
-        renderGifts();
-    })
-    .catch(err => alert("❌ Erro: " + err.message));
-};
-
-window.loginComGoogle = function() {
-    auth.signInWithPopup(providerGoogle)
-    .then(result => {
-        const uid = result.user.uid;
-        alert(`🔍 UID GOOGLE: ${uid}\nUID ADMIN: ${MEU_UID}\nIGUAIS? ${uid === MEU_UID ? 'SIM ✅' : 'NÃO ❌'}`);
-
-        if(uid === MEU_UID) {
-            isAdmin = true;
-            usuarioAtualNome = result.user.displayName || "Administrador";
-            mostrarBotoesAdmin();
-            alert("✅ LOGADO GOOGLE ADMIN!");
-        } else {
-            return db.ref(`admins/${uid}`).once('value').then(snap => {
-                isAdmin = snap.exists();
-                usuarioAtualNome = result.user.displayName || "Usuário";
-                if(isAdmin) mostrarBotoesAdmin();
-            });
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .card-item {
+                @apply transition-all duration-300 hover:scale-[1.02];
+            }
+            .reservado {
+                @apply opacity-60 grayscale;
+            }
+            .modal {
+                @apply fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm;
+            }
+            .modal-content {
+                @apply bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 mx-4;
+            }
         }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-pink-50 to-purple-50 min-h-screen font-sans">
 
-        screenAdminLogin.classList.add('hidden');
-        screenDashboard.classList.remove('hidden');
-        atualizarSaudacao();
-        renderGifts();
-    })
-    .catch(err => alert("❌ Erro Google: " + err.message));
-};
+    <!-- TELA DE LOGIN COMUM -->
+    <div id="screen-login" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md text-center">
+            <h1 id="login-title" class="text-[clamp(1.8rem,4vw,2.5rem)] font-bold text-pink-500 mb-2">Lista de Presentes</h1>
+            <p id="login-subtitle" class="text-gray-600 mb-8">Identifique-se para acessar</p>
 
-window.handleLogout = function() {
-    auth.signOut();
-    isAdmin = false;
-    usuarioAtualNome = "";
-    screenDashboard.classList.add('hidden');
-    screenLogin.classList.remove('hidden');
-    document.getElementById('username').value = '';
-};
-
-window.openNewItemModal = function() {
-    if(!isAdmin) return alert("❌ Acesso restrito!");
-    document.getElementById('edit-modal-title').textContent = "Novo Presente";
-    document.getElementById('edit-id').value = "";
-    document.getElementById('edit-name').value = "";
-    document.getElementById('edit-price').value = "";
-    document.getElementById('edit-icon').value = "";
-    document.getElementById('edit-imagem').value = "";
-    document.getElementById('edit-pixkey').value = "";
-    document.getElementById('btn-delete').classList.add('hidden');
-    document.getElementById('edit-modal').classList.remove('hidden');
-};
-
-window.openEditModal = function(id) {
-    if(!isAdmin) return alert("❌ Acesso restrito!");
-    const item = giftsData.find(g => g.id === id);
-    if(!item) return;
-    document.getElementById('edit-modal-title').textContent = "Editar Presente";
-    document.getElementById('edit-id').value = item.id;
-    document.getElementById('edit-name').value = item.name;
-    document.getElementById('edit-price').value = item.price;
-    document.getElementById('edit-icon').value = item.icon || "";
-    document.getElementById('edit-imagem').value = item.imagem || "";
-    document.getElementById('edit-pixkey').value = item.pixKey;
-    document.getElementById('btn-delete').classList.remove('hidden');
-    document.getElementById('edit-modal').classList.remove('hidden');
-};
-
-window.openPixModal = function(id) {
-    const item = giftsData.find(g => g.id === id);
-    if(!item) return;
-    itemAtualId = id;
-
-    document.getElementById('modal-gift-name').textContent = item.name;
-    document.getElementById('modal-gift-value').textContent = item.price;
-    document.getElementById('pix-copia-cola').textContent = item.pixKey;
-    document.getElementById('modal-qr-code').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(item.pixKey)}`;
-
-    if(item.reservadoPor) {
-        document.getElementById('modalReservadoPor').textContent = item.reservadoPor;
-        document.getElementById('modalMensagemRecado').textContent = item.mensagem || "Sem mensagem";
-        document.getElementById('botoes-acao-pix').classList.remove('hidden');
-    } else {
-        document.getElementById('modalReservadoPor').textContent = "Ainda não reservado";
-        document.getElementById('modalMensagemRecado').textContent = "";
-        document.getElementById('botoes-acao-pix').classList.add('hidden');
-    }
-
-    document.getElementById('pix-modal').classList.remove('hidden');
-};
-
-window.abrirReserva = function(id, nome) {
-    const item = giftsData.find(g => g.id === id);
-    if(item && item.reservadoPor) return alert("⚠️ Já reservado!");
-    document.getElementById('reserva-id').value = id;
-    document.getElementById('reserva-nome-item').textContent = nome;
-    document.getElementById('reserva-nome').value = usuarioAtualNome;
-    document.getElementById('reserva-modal').classList.remove('hidden');
-};
-
-window.confirmarReserva = function(e) {
-    e.preventDefault();
-    const id = document.getElementById('reserva-id').value;
-    const nome = document.getElementById('reserva-nome').value.trim();
-    const msg = document.getElementById('reserva-mensagem').value.trim();
-
-    db.ref(`gifts/${id}`).update({
-        reservadoPor: nome,
-        mensagem: msg,
-        status: 'reservado'
-    })
-    .then(() => {
-        alert("✅ Reserva confirmada!");
-        closeModal('reserva-modal');
-        openPixModal(id);
-    })
-    .catch(err => alert("❌ Erro: " + err.message));
-};
-
-window.confirmarCompra = function() {
-    if(!confirm("Confirmar compra?")) return;
-    db.ref(`gifts/${itemAtualId}`).update({ status: 'pago' })
-    .then(() => {
-        alert("✅ Compra confirmada!");
-        closeModal('pix-modal');
-    });
-};
-
-window.cancelarReserva = function() {
-    if(!confirm("Cancelar reserva?")) return;
-    db.ref(`gifts/${itemAtualId}`).update({
-        reservadoPor: null,
-        mensagem: null,
-        status: null
-    })
-    .then(() => {
-        alert("✅ Reserva cancelada!");
-        closeModal('pix-modal');
-    });
-};
-
-window.reativarItem = function(id) {
-    if(!isAdmin) return;
-    if(!confirm("Reativar item?")) return;
-    db.ref(`gifts/${id}`).update({ reservadoPor: null, mensagem: null, status: null });
-};
-
-window.abrirListaCompras = function() {
-    if(!isAdmin) return;
-    const comprados = giftsData.filter(g => g.reservadoPor);
-    const html = comprados.length === 0 
-        ? "<p class='text-center text-gray-500'>Nenhum item comprado</p>"
-        : comprados.map(i => `
-            <div class="p-3 border rounded bg-white">
-                <p class="font-bold">${i.name} - ${i.price}</p>
-                <p class="text-sm">Comprador: ${i.reservadoPor}</p>
-                <p class="text-sm italic">Recado: ${i.mensagem || '---'}</p>
-            </div>`).join('');
-    document.getElementById('lista-compras-conteudo').innerHTML = html;
-    document.getElementById('lista-compras-modal').classList.remove('hidden');
-};
-
-window.abrirLogs = function() {
-    if(!isAdmin) return;
-    db.ref('logs').orderByKey().limitToLast(20).once('value').then(snap => {
-        const logs = [];
-        snap.forEach(c => logs.unshift({id:c.key,...c.val()}));
-        const html = logs.length === 0 
-            ? "<p class='text-center text-gray-500'>Nenhum registro</p>"
-            : logs.map(l => `<div class="p-1 border-b text-xs"><span class="text-gray-500">[${l.data} ${l.hora}]</span> <strong>${l.tipo}</strong>: ${l.descricao}</div>`).join('');
-        document.getElementById('logs-conteudo').innerHTML = html;
-        document.getElementById('logs-modal').classList.remove('hidden');
-    });
-};
-
-window.openSettingsModal = function() {
-    if(!isAdmin) return;
-    document.getElementById('cfg-login-title').value = siteConfig.loginTitle || "";
-    document.getElementById('cfg-login-subtitle').value = siteConfig.loginSubtitle || "";
-    document.getElementById('cfg-main-title').value = siteConfig.mainTitle || "";
-    document.getElementById('cfg-welcome-text').value = siteConfig.welcomeText || "";
-    document.getElementById('cfg-bg-image').value = siteConfig.backgroundImage || "";
-    document.getElementById('cfg-footer-text').value = siteConfig.footerText || "";
-    document.getElementById('settings-modal').classList.remove('hidden');
-};
-
-window.abrirAdicionarAdmin = function() {
-    if(!isAdmin || auth.currentUser.uid !== MEU_UID) return alert("❌ Apenas você pode cadastrar!");
-    document.getElementById('admin-modal').classList.remove('hidden');
-};
-
-window.cadastrarNovoAdmin = function(e) {
-    e.preventDefault();
-    const email = document.getElementById('novo-admin-email').value.trim();
-    const senha = document.getElementById('novo-admin-senha').value;
-
-    auth.createUserWithEmailAndPassword(email, senha)
-    .then(usuario => {
-        return db.ref(`admins/${usuario.user.uid}`).set(true);
-    })
-    .then(() => {
-        alert("✅ Novo admin cadastrado!");
-        closeModal('admin-modal');
-        document.getElementById('novo-admin-email').value = "";
-        document.getElementById('novo-admin-senha').value = "";
-    })
-    .catch(err => alert("❌ Erro: " + err.message));
-};
-
-window.saveItem = function(e) {
-    e.preventDefault();
-    if(!isAdmin) return;
-    const dados = {
-        name: document.getElementById('edit-name').value.trim(),
-        price: document.getElementById('edit-price').value.trim(),
-        icon: document.getElementById('edit-icon').value.trim(),
-        imagem: document.getElementById('edit-imagem').value.trim(),
-        pixKey: document.getElementById('edit-pixkey').value.trim()
-    };
-
-    const id = document.getElementById('edit-id').value;
-    const ref = id ? db.ref(`gifts/${id}`) : db.ref('gifts').push();
-    ref.set(dados).then(() => closeModal('edit-modal'));
-};
-
-window.deleteItem = function() {
-    if(!isAdmin || !confirm("Excluir?")) return;
-    db.ref(`gifts/${document.getElementById('edit-id').value}`).remove().then(() => closeModal('edit-modal'));
-};
-
-window.saveSettings = function(e) {
-    e.preventDefault();
-    if(!isAdmin) return;
-    const dados = {
-        loginTitle: document.getElementById('cfg-login-title').value,
-        loginSubtitle: document.getElementById('cfg-login-subtitle').value,
-        mainTitle: document.getElementById('cfg-main-title').value,
-        welcomeText: document.getElementById('cfg-welcome-text').value,
-        backgroundImage: document.getElementById('cfg-bg-image').value,
-        footerText: document.getElementById('cfg-footer-text').value
-    };
-    db.ref('configuracoes').update(dados).then(() => closeModal('settings-modal'));
-};
-
-// INICIALIZAÇÃO
-document.addEventListener("DOMContentLoaded", () => {
-    // Carrega configurações
-    db.ref('configuracoes').on('value', snap => {
-        siteConfig = snap.val() || {};
-        document.getElementById('login-title').textContent = siteConfig.loginTitle || "Lista de Presentes";
-        document.getElementById('login-subtitle').textContent = siteConfig.loginSubtitle || "Identifique-se";
-        document.getElementById('main-title').textContent = siteConfig.mainTitle || "Presentes";
-        footerText.textContent = siteConfig.footerText || "© 2026";
-        if(siteConfig.backgroundImage) paginaPrincipal.style.backgroundImage = `url(${siteConfig.backgroundImage})`;
-        if(usuarioAtualNome) atualizarSaudacao();
-    });
-
-    // Carrega itens
-    db.ref('gifts').on('value', snap => {
-        giftsData = [];
-        snap.forEach(c => giftsData.push({id:c.key, ...c.val()}));
-        renderGifts();
-    });
-});
-
-function atualizarSaudacao() {
-    welcomeText.innerHTML = (siteConfig.welcomeText || "Olá, [NOME]! Escolha um item.")
-        .replace("[NOME]", `<span class="font-bold text-pink-600">${usuarioAtualNome}</span>`);
-}
-
-function mostrarBotoesAdmin() {
-    btnNewItem.classList.remove('hidden');
-    btnSettings.classList.remove('hidden');
-    btnListaCompras.classList.remove('hidden');
-    btnLogs.classList.remove('hidden');
-    btnAdicionarAdmin.classList.remove('hidden');
-}
-
-function renderGifts() {
-    if(!giftsGrid) return;
-    giftsGrid.innerHTML = giftsData.length === 0 
-        ? "<p class='text-center col-span-full p-8 bg-white/80 rounded-xl'>Nenhum item cadastrado</p>"
-        : giftsData.map(item => `
-        <div class="card-item bg-white rounded-xl shadow p-6 relative ${item.reservadoPor ? 'reservado' : ''}">
-            ${isAdmin ? `<button onclick="openEditModal('${item.id}')" class="absolute top-2 right-10 text-gray-600 hover:text-pink-500">✏️</button>` : ''}
-            <div class="text-4xl mb-4">
-                <img src="${item.icon || 'https://cdn-icons-png.flaticon.com/512/3099/3099358.png'}" class="w-12 h-12">
+            <div class="mb-6 text-left">
+                <label class="block text-gray-700 font-medium mb-2">Seu nome</label>
+                <input type="text" id="username" placeholder="Digite seu nome" 
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition">
             </div>
-            <h3 class="font-bold text-lg">${item.name}</h3>
-            <p class="text-pink-600 font-bold text-xl my-2">${item.price}</p>
-            <button onclick="${item.reservadoPor ? `openPixModal('${item.id}')` : `abrirReserva('${item.id}','${item.name.replace(/'/g, "\\'")}')`}" 
-                class="w-full mt-2 py-2 rounded-lg font-semibold ${item.reservadoPor ? 'bg-gray-500 text-white' : 'bg-pink-500 hover:bg-pink-600 text-white'}">
-                ${item.reservadoPor ? 'Ver PIX' : 'Escolher este'}
+
+            <button onclick="handleLogin(event)" 
+                class="w-full bg-pink-500 hover:bg-pink-600 text-white font-semibold py-3 px-4 rounded-lg transition mb-4">
+                Acessar Lista
             </button>
-        </div>`).join('');
-}
+
+            <button onclick="showAdminLogin()" class="text-pink-500 hover:text-pink-700 font-medium text-sm">
+                Acesso Administrador
+            </button>
+        </div>
+    </div>
+
+    <!-- TELA DE LOGIN ADMINISTRADOR -->
+    <div id="screen-admin-login" class="hidden min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md text-center">
+            <h2 class="text-2xl font-bold text-pink-500 mb-6">Acesso Administrador</h2>
+
+            <div class="mb-4 text-left">
+                <label class="block text-gray-700 font-medium mb-2">E-mail</label>
+                <input type="email" id="admin-email" placeholder="seu@email.com" 
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition">
+            </div>
+
+            <div class="mb-6 text-left">
+                <label class="block text-gray-700 font-medium mb-2">Senha</label>
+                <input type="password" id="admin-password" placeholder="••••••••" 
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition">
+                <button onclick="abrirRecuperarSenha()" class="text-xs text-pink-500 hover:underline mt-1 inline-block">
+                    Esqueci minha senha
+                </button>
+            </div>
+
+            <button onclick="handleAdminLogin(event)" 
+                class="w-full bg-pink-500 hover:bg-pink-600 text-white font-semibold py-3 px-4 rounded-lg transition mb-3">
+                Entrar
+            </button>
+
+            <button onclick="loginComGoogle()" 
+                class="w-full bg-white border border-gray-300 hover:bg-gray-gray-50 text-gray-700 font-semibold py-3 px-4 rounded-lg transition mb-4 flex items-center justify-center gap-2">
+                <i class="fa fa-google"></i> Entrar com Google
+            </button>
+
+            <button onclick="hideAdminLogin()" class="text-gray-600 hover:text-gray-800 text-sm">
+                Voltar
+            </button>
+        </div>
+    </div>
+
+    <!-- TELA PRINCIPAL / DASHBOARD -->
+    <div id="screen-dashboard" class="hidden min-h-screen p-4 md:p-8" id="pagina-principal">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+                <div>
+                    <h1 id="main-title" class="text-[clamp(1.5rem,3vw,2.2rem)] font-bold text-pink-600">Presentes</h1>
+                    <p id="welcomeText" class="text-gray-600 mt-1"></p>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                    <button id="btn-new-item" onclick="openNewItemModal()" class="hidden bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-lg transition">
+                        + Novo Item
+                    </button>
+                    <button id="btn-settings" onclick="openSettingsModal()" class="hidden bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-lg transition">
+                        ⚙️ Configurações
+                    </button>
+                    <button id="btn-lista-compras" onclick="abrirListaCompras()" class="hidden bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition">
+                        📋 Comprados
+                    </button>
+                    <button id="btn-logs" onclick="abrirLogs()" class="hidden bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
+                        📜 Logs
+                    </button>
+                    <button id="btn-adicionar-admin" onclick="abrirAdicionarAdmin()" class="hidden bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition">
+                        👑 Novo Admin
+                    </button>
+                    <button onclick="handleLogout()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition">
+                        Sair
+                    </button>
+                </div>
+            </div>
+
+            <div id="gifts-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <!-- Itens carregados pelo JavaScript -->
+            </div>
+
+            <footer id="footer-text" class="mt-16 text-center text-gray-500 text-sm">
+                © 2026 Lista de Presentes
+            </footer>
+        </div>
+    </div>
+
+    <!-- ============================================== MODAIS ============================================== -->
+
+    <!-- MODAL: Adicionar / Editar Item -->
+    <div id="edit-modal" class="hidden modal">
+        <div class="modal-content">
+            <h3 id="edit-modal-title" class="text-xl font-bold text-gray-800 mb-4">Editar Presente</h3>
+            <form onsubmit="saveItem(event)">
+                <input type="hidden" id="edit-id">
+                <div class="mb-3">
+                    <label class="block text-gray-700 text-sm mb-1">Nome</label>
+                    <input type="text" id="edit-name" class="w-full px-3 py-2 border rounded-lg" required>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-gray-700 text-sm mb-1">Preço</label>
+                    <input type="text" id="edit-price" class="w-full px-3 py-2 border rounded-lg" placeholder="R$ 0,00" required>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-gray-700 text-sm mb-1">Ícone (URL)</label>
+                    <input type="text" id="edit-icon" class="w-full px-3 py-2 border rounded-lg">
+                </div>
+                <div class="mb-3">
+                    <label class="block text-gray-700 text-sm mb-1">Imagem (URL)</label>
+                    <input type="text" id="edit-imagem" class="w-full px-3 py-2 border rounded-lg">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm mb-1">Chave PIX</label>
+                    <input type="text" id="edit-pixkey" class="w-full px-3 py-2 border rounded-lg" required>
+                </div>
+                <div class="flex justify-between gap-2">
+                    <button type="button" onclick="closeModal('edit-modal')" class="flex-1 bg-gray-200 hover:bg-gray-300 py-2 rounded-lg">Cancelar</button>
+                    <button type="submit" class="flex-1 bg-pink-500 hover:bg-pink-600 text-white py-2 rounded-lg">Salvar</button>
+                    <button type="button" id="btn-delete" onclick="deleteItem()" class="hidden bg-red-500 hover:bg-red-600 text-white py-2 px-3 rounded-lg">Excluir</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: PIX e Detalhes -->
+    <div id="pix-modal" class="hidden modal">
+        <div class="modal-content text-center">
+            <h3 id="modal-gift-name" class="text-xl font-bold mb-2"></h3>
+            <p id="modal-gift-value" class="text-pink-600 font-bold text-lg mb-4"></p>
+            
+            <img id="modal-qr-code" src="" class="w-48 h-48 mx-auto mb-4 rounded-lg border">
+            
+            <div class="bg-gray-100 p-3 rounded-lg mb-4">
+                <p class="text-sm text-gray-600 mb-1">Código PIX:</p>
+                <p id="pix-copia-cola" class="font-mono text-sm break-all"></p>
+                <button onclick="copyPixKey()" class="mt-2 text-pink-500 text-sm hover:underline">Copiar</button>
+            </div>
+
+            <div class="text-left mb-4">
+                <p class="text-sm font-semibold">Reservado por: <span id="modalReservadoPor" class="font-normal"></span></p>
+                <p class="text-sm mt-1">Recado: <span id="modalMensagemRecado" class="font-normal italic"></span></p>
+            </div>
+
+            <div id="botoes-acao-pix" class="flex gap-2 mb-4">
+                <button onclick="confirmarCompra()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Confirmar Compra</button>
+                <button onclick="cancelarReserva()" class="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg">Cancelar Reserva</button>
+            </div>
+
+            <button onclick="closeModal('pix-modal')" class="w-full bg-gray-200 hover:bg-gray-300 py-2 rounded-lg">Fechar</button>
+        </div>
+    </div>
+
+    <!-- MODAL: Reservar Item -->
+    <div id="reserva-modal" class="hidden modal">
+        <div class="modal-content">
+            <h3 class="text-lg font-bold mb-3">Reservar: <span id="reserva-nome-item"></span></h3>
+            <form onsubmit="confirmarReserva(event)">
+                <input type="hidden" id="reserva-id">
+                <div class="mb-3">
+                    <label class="block text-sm mb-1">Seu nome</label>
+                    <input type="text" id="reserva-nome" class="w-full px-3 py-2 border rounded-lg" required>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm mb-1">Recado (opcional)</label>
+                    <textarea id="reserva-mensagem" class="w-full px-3 py-2 border rounded-lg" rows="3" placeholder="Deixe uma mensagem..."></textarea>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="closeModal('reserva-modal')" class="flex-1 bg-gray-200 hover:bg-gray-300 py-2 rounded-lg">Cancelar</button>
+                    <button type="submit" class="flex-1 bg-pink-500 hover:bg-pink-600 text-white py-2 rounded-lg">Confirmar Reserva</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Configurações do Sistema -->
+    <div id="settings-modal" class="hidden modal">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold mb-4">Configurações do Sistema</h3>
+            <form onsubmit="saveSettings(event)">
+                <div class="mb-3">
+                    <label class="block text-sm mb-1">Título da tela de login</label>
+                    <input type="text" id="cfg-login-title" class="w-full px-3 py-2 border rounded-lg">
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm mb-1">Subtítulo da tela de login</label>
+                    <input type="text" id="cfg-login-subtitle" class="w-full px-3 py-2 border rounded-lg">
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm mb-1">Título principal</label>
+                    <input type="text" id="cfg-main-title" class="w-full px-3 py-2 border rounded-lg">
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm mb-1">Texto de boas-vindas</label>
+                    <input type="text" id="cfg-welcome-text" class="w-full px-3 py-2 border rounded-lg" placeholder="Olá, [NOME]!">
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm mb-1">Imagem de fundo (URL)</label>
+                    <input type="text" id="cfg-bg-image" class="w-full px-3 py-2 border rounded-lg">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm mb-1">Texto do rodapé</label>
+                    <input type="text" id="cfg-footer-text" class="w-full px-3 py-2 border rounded-lg">
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="closeModal('settings-modal')" class="flex-1 bg-gray-200 hover:bg-gray-300 py-2 rounded-lg">Cancelar</button>
+                    <button type="submit" class="flex-1 bg-pink-500 hover:bg-pink-600 text-white py-2 rounded-lg">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Cadastrar Novo Admin -->
+    <div id="admin-modal" class="hidden modal">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold mb-4">Cadastrar Novo Administrador</h3>
+            <form onsubmit="cadastrarNovoAdmin(event)">
+                <div class="mb-3">
+                    <label class="block text-sm mb-1">E-mail</label>
+                    <input type="email" id="novo-admin-email" class="w-full px-3 py-2 border rounded-lg" required>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm mb-1">Senha</label>
+                    <input type="password" id="novo-admin-senha" class="w-full px-3 py-2 border rounded-lg" required minlength="6">
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="closeModal('admin-modal')" class="flex-1 bg-gray-200 hover:bg-gray-300 py-2 rounded-lg">Cancelar</button>
+                    <button type="submit" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg">Cadastrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Recuperar Senha -->
+    <div id="recuperar-senha-modal" class="hidden modal">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold mb-4">Recuperar Senha</h3>
+            <div class="mb-4">
+                <label class="block text-sm mb-1">Seu e-mail de cadastro</label>
+                <input type="email" id="email-recuperacao" class="w-full px-3 py-2 border rounded-lg" required>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="closeModal('recuperar-senha-modal')" class="flex-1 bg-gray-200 hover:bg-gray-300 py-2 rounded-lg">Cancelar</button>
+                <button onclick="enviarRecuperacao()" class="flex-1 bg-pink-500 hover:bg-pink-600 text-white py-2 rounded-lg">Enviar Link</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Lista de Comprados/Reservados -->
+    <div id="lista-compras-modal" class="hidden modal">
+        <div class="modal-content max-w-2xl">
+            <h3 class="text-xl font-bold mb-4">Itens Comprados/Reservados</h3>
+            <div id="lista-compras-conteudo" class="max-h-[60vh] overflow-y-auto mb-4 space-y-2">
+                <!-- Conteúdo gerado pelo JS -->
+            </div>
+            <button onclick="closeModal('lista-compras-modal')" class="w-full bg-gray-200 hover:bg-gray-300 py-2 rounded-lg">Fechar</button>
+        </div>
+    </div>
+
+    <!-- MODAL: Logs do Sistema -->
+    <div id="logs-modal" class="hidden modal">
+        <div class="modal-content max-w-2xl">
+            <h3 class="text-xl font-bold mb-4">Registro de Ações</h3>
+            <div id="logs-conteudo" class="max-h-[60vh] overflow-y-auto mb-4 space-y-1 text-sm">
+                <!-- Conteúdo gerado pelo JS -->
+            </div>
+            <button onclick="closeModal('logs-modal')" class="w-full bg-gray-200 hover:bg-gray-300 py-2 rounded-lg">Fechar</button>
+        </div>
+    </div>
+
+    <!-- ============================================== FIREBASE ============================================== -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js"></script>
+
+    <!-- SEU CÓDIGO PRINCIPAL -->
+    <script src="app.js"></script>
+</body>
+</html>
