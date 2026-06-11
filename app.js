@@ -1,33 +1,16 @@
-// ==============================================
-// CONFIGURAÇÃO DO FIREBASE - COLE SEUS DADOS AQUI
-// ==============================================
-const firebaseConfig = {
-    apiKey: "COLE_SUA_API_KEY_AQUI",
-    authDomain: "lista-sophia.firebaseapp.com",
-    databaseURL: "https://lista-sophia-default-rtdb.firebaseio.com/",
-    projectId: "lista-sophia",
-    storageBucket: "lista-sophia.appspot.com",
-    messagingSenderId: "123456789",
-    appId: "1:123456789:web:abc123def456"
-};
+import { db, auth, providerGoogle, ref, onValue, set, update, push, remove, get, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, sendPasswordResetEmail, signOut, onAuthStateChanged } from './firebase.js';
 
-// Inicializa Firebase
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-const auth = firebase.auth();
-const providerGoogle = new firebase.auth.GoogleAuthProvider();
+// ✅ SEU UID PRINCIPAL (SEM ELE NINGUÉM CRIA NINGUÉM)
+const UID_MESTRE = "lWScb6ixfRQRNBkPloMdKcGFHzS2";
 
-// SEU UID DE ADMIN
-const MEU_UID = "lWScb6ixfRQRNBkPloMdKcGFHzS2";
-
-// VARIÁVEIS GLOBAIS
+// Variáveis Globais
 let isAdmin = false;
 let giftsData = [];
 let siteConfig = {};
 let usuarioAtualNome = "";
 let itemAtualId = "";
 
-// ELEMENTOS DA TELA
+// Elementos da página
 const screenLogin = document.getElementById('screen-login');
 const screenAdminLogin = document.getElementById('screen-admin-login');
 const screenDashboard = document.getElementById('screen-dashboard');
@@ -35,25 +18,65 @@ const giftsGrid = document.getElementById('gifts-grid');
 const welcomeText = document.getElementById('welcomeText');
 const footerText = document.getElementById('footer-text');
 const paginaPrincipal = document.getElementById('pagina-principal');
-
 const btnNewItem = document.getElementById('btn-new-item');
 const btnSettings = document.getElementById('btn-settings');
 const btnListaCompras = document.getElementById('btn-lista-compras');
 const btnLogs = document.getElementById('btn-logs');
-const btnAdicionarAdmin = document.getElementById('btn-adicionar-admin');
+const btnAdicionarAdmin = document.getElementById('btn-adicionar-admin'); // NOVO BOTÃO
 
-// ==============================================
-// FUNÇÕES GERAIS
-// ==============================================
+// Elementos Modais
+const editModal = document.getElementById('edit-modal');
+const editId = document.getElementById('edit-id');
+const editName = document.getElementById('edit-name');
+const editPrice = document.getElementById('edit-price');
+const editIcon = document.getElementById('edit-icon');
+const editImagem = document.getElementById('edit-imagem');
+const editPixKey = document.getElementById('edit-pixkey');
+const btnDelete = document.getElementById('btn-delete');
+
+const pixModal = document.getElementById('pix-modal');
+const modalGiftName = document.getElementById('modal-gift-name');
+const modalGiftValue = document.getElementById('modal-gift-value');
+const modalQrCode = document.getElementById('modal-qr-code');
+const pixCopiaCola = document.getElementById('pix-copia-cola');
+const modalReservadoPor = document.getElementById('modal-reservado-por');
+const modalMensagemRecado = document.getElementById('modal-mensagem-recado');
+const botoesAcaoPix = document.getElementById('botoes-acao-pix');
+
+const reservaModal = document.getElementById('reserva-modal');
+const reservaId = document.getElementById('reserva-id');
+const reservaNomeItem = document.getElementById('reserva-nome-item');
+const reservaNome = document.getElementById('reserva-nome');
+const reservaMensagem = document.getElementById('reserva-mensagem');
+
+const settingsModal = document.getElementById('settings-modal');
+const cfgLoginTitle = document.getElementById('cfg-login-title');
+const cfgLoginSubtitle = document.getElementById('cfg-login-subtitle');
+const cfgMainTitle = document.getElementById('cfg-main-title');
+const cfgWelcomeText = document.getElementById('cfg-welcome-text');
+const cfgBgImage = document.getElementById('cfg-bg-image');
+const cfgFooterText = document.getElementById('cfg-footer-text');
+
+// 🆕 MODAL ADICIONAR ADMIN
+const adminModal = document.getElementById('admin-modal');
+const novoAdminEmail = document.getElementById('novo-admin-email');
+const novoAdminSenha = document.getElementById('novo-admin-senha');
+
+// 🆕 MODAL RECUPERAR SENHA
+const recuperarSenhaModal = document.getElementById('recuperar-senha-modal');
+const emailRecuperacao = document.getElementById('email-recuperacao');
+
+// FUNÇÕES GLOBAIS
 window.closeModal = function(modalId) {
-    document.getElementById(modalId).classList.add('hidden');
+    const modal = document.getElementById(modalId);
+    if(modal) modal.classList.add('hidden');
 };
 
 window.copyPixKey = function() {
-    const texto = document.getElementById('pix-copia-cola').textContent;
-    navigator.clipboard.writeText(texto)
+    if (!pixCopiaCola) return;
+    navigator.clipboard.writeText(pixCopiaCola.textContent)
     .then(() => alert("✅ Código PIX copiado!"))
-    .catch(() => alert("❌ Erro ao copiar"));
+    .catch(() => alert("❌ Erro ao copiar, copie manualmente."));
 };
 
 window.showAdminLogin = function() {
@@ -66,307 +89,397 @@ window.hideAdminLogin = function() {
     screenLogin.classList.remove('hidden');
 };
 
+// 🆕 RECUPERAR SENHA
 window.abrirRecuperarSenha = function() {
-    document.getElementById('recuperar-senha-modal').classList.remove('hidden');
+    recuperarSenhaModal.classList.remove('hidden');
 };
 
-window.enviarRecuperacao = function() {
-    const email = document.getElementById('email-recuperacao').value.trim();
-    if (!email) return alert("Digite seu e-mail!");
-    auth.sendPasswordResetEmail(email)
-    .then(() => {
-        alert("✅ E-mail enviado! Verifique sua caixa de entrada.");
+window.enviarRecuperacao = async function() {
+    const email = emailRecuperacao.value.trim();
+    if(!email) return alert("Digite o e-mail!");
+    try {
+        await sendPasswordResetEmail(auth, email);
+        alert("✅ E-mail de recuperação enviado! Verifique sua caixa de entrada.");
         closeModal('recuperar-senha-modal');
-    })
-    .catch(err => alert("❌ Erro: " + err.message));
+    } catch (erro) {
+        alert("❌ Erro: " + erro.message);
+    }
 };
 
-// ==============================================
-// LOGIN
-// ==============================================
-window.handleLogin = function(e) {
-    e.preventDefault();
-    const nome = document.getElementById('username').value.trim();
-    if (!nome) return alert("Digite seu nome!");
-    
-    usuarioAtualNome = nome;
-    isAdmin = false;
-    atualizarSaudacao();
-    screenLogin.classList.add('hidden');
-    screenDashboard.classList.remove('hidden');
-    renderGifts();
-};
-
-window.handleAdminLogin = function(e) {
-    e.preventDefault();
+window.handleAdminLogin = async function(event) {
+    event.preventDefault();
     const email = document.getElementById('admin-email').value.trim();
     const senha = document.getElementById('admin-password').value;
 
-    auth.signInWithEmailAndPassword(email, senha)
-    .then(result => {
-        const uid = result.user.uid;
-        if (uid === MEU_UID) {
+    try {
+        const resultado = await signInWithEmailAndPassword(auth, email, senha);
+        
+        // ✅ VERIFICA SE É ADMIN NO BANCO
+        const snapAdmin = await get(ref(db, `admins/${resultado.user.uid}`));
+        if (snapAdmin.exists()) {
             isAdmin = true;
             usuarioAtualNome = "Administrador";
             mostrarBotoesAdmin();
-            alert("✅ Acesso Administrador liberado!");
+            alert("✅ LOGADO COMO ADMINISTRADOR!");
         } else {
-            return db.ref(`admins/${uid}`).once('value').then(snap => {
-                isAdmin = snap.exists();
-                usuarioAtualNome = isAdmin ? "Administrador" : "Usuário";
-                if (isAdmin) mostrarBotoesAdmin();
-            });
+            isAdmin = false;
+            alert("❌ Acesso negado! Você não é administrador.");
+            return;
         }
 
         screenAdminLogin.classList.add('hidden');
         screenDashboard.classList.remove('hidden');
         atualizarSaudacao();
         renderGifts();
-    })
-    .catch(err => alert("❌ Erro: " + err.message));
+        
+    } catch (erro) {
+        console.error("ERRO LOGIN:", erro);
+        alert("❌ Erro: Verifique e-mail e senha.");
+    }
 };
 
-window.loginComGoogle = function() {
-    auth.signInWithPopup(providerGoogle)
-    .then(result => {
-        const uid = result.user.uid;
-        if (uid === MEU_UID) {
+window.loginComGoogle = async function() {
+    try {
+        const resultado = await signInWithPopup(auth, providerGoogle);
+
+        // ✅ VERIFICA SE É ADMIN NO BANCO
+        const snapAdmin = await get(ref(db, `admins/${resultado.user.uid}`));
+        if (snapAdmin.exists()) {
             isAdmin = true;
-            usuarioAtualNome = result.user.displayName || "Administrador";
+            usuarioAtualNome = resultado.user.displayName || "Administrador";
             mostrarBotoesAdmin();
+            alert("✅ LOGADO COM GOOGLE COMO ADMIN!");
         } else {
-            return db.ref(`admins/${uid}`).once('value').then(snap => {
-                isAdmin = snap.exists();
-                usuarioAtualNome = result.user.displayName || "Usuário";
-                if (isAdmin) mostrarBotoesAdmin();
-            });
+            isAdmin = false;
+            usuarioAtualNome = resultado.user.displayName || "Usuário";
         }
 
         screenAdminLogin.classList.add('hidden');
         screenDashboard.classList.remove('hidden');
         atualizarSaudacao();
         renderGifts();
-    })
-    .catch(err => alert("❌ Erro Google: " + err.message));
+
+    } catch (erro) {
+        console.error("ERRO GOOGLE:", erro);
+        alert("❌ Erro: " + erro.message);
+    }
 };
 
-window.handleLogout = function() {
-    auth.signOut().catch(() => {});
+window.handleLogin = function(event) {
+    event.preventDefault();
+    const username = document.getElementById('username').value.trim();
     isAdmin = false;
-    usuarioAtualNome = "";
+    if (username) {
+        usuarioAtualNome = username;
+        atualizarSaudacao();
+        screenLogin.classList.add('hidden');
+        screenDashboard.classList.remove('hidden');
+        btnNewItem.classList.add('hidden');
+        btnSettings.classList.add('hidden');
+        btnListaCompras.classList.add('hidden');
+        btnLogs.classList.add('hidden');
+        btnAdicionarAdmin.classList.add('hidden');
+        renderGifts();
+    }
+};
+
+window.handleLogout = async function() {
+    try { await signOut(auth); } catch (e) {}
     screenDashboard.classList.add('hidden');
     screenLogin.classList.remove('hidden');
+    isAdmin = false;
+    usuarioAtualNome = "";
     document.getElementById('username').value = '';
 };
 
-// ==============================================
-// ITENS / PRESENTES
-// ==============================================
 window.openNewItemModal = function() {
-    if (!isAdmin) return alert("❌ Acesso restrito!");
-    document.getElementById('edit-modal-title').textContent = "Novo Presente";
-    document.getElementById('edit-id').value = "";
-    document.getElementById('edit-name').value = "";
-    document.getElementById('edit-price').value = "";
-    document.getElementById('edit-icon').value = "";
-    document.getElementById('edit-imagem').value = "";
-    document.getElementById('edit-pixkey').value = "";
-    document.getElementById('btn-delete').classList.add('hidden');
-    document.getElementById('edit-modal').classList.remove('hidden');
+    if(!editModal || !isAdmin) { alert("❌ Acesso restrito!"); return; }
+    document.getElementById('edit-modal-title').textContent = "Adicionar Novo Presente";
+    editId.value = "";
+    editName.value = "";
+    editPrice.value = "";
+    editIcon.value = "";
+    editImagem.value = "";
+    editPixKey.value = "";
+    btnDelete.classList.add('hidden');
+    editModal.classList.remove('hidden');
 };
 
-window.openEditModal = function(id) {
-    if (!isAdmin) return alert("❌ Acesso restrito!");
-    const item = giftsData.find(g => g.id === id);
-    if (!item) return;
-
-    document.getElementById('edit-modal-title').textContent = "Editar Presente";
-    document.getElementById('edit-id').value = item.id;
-    document.getElementById('edit-name').value = item.name;
-    document.getElementById('edit-price').value = item.price;
-    document.getElementById('edit-icon').value = item.icon || "";
-    document.getElementById('edit-imagem').value = item.imagem || "";
-    document.getElementById('edit-pixkey').value = item.pixKey;
-    document.getElementById('btn-delete').classList.remove('hidden');
-    document.getElementById('edit-modal').classList.remove('hidden');
-};
-
-window.openPixModal = function(id) {
-    const item = giftsData.find(g => g.id === id);
-    if (!item) return;
-    itemAtualId = id;
-
-    document.getElementById('modal-gift-name').textContent = item.name;
-    document.getElementById('modal-gift-value').textContent = item.price;
-    document.getElementById('pix-copia-cola').textContent = item.pixKey;
-    document.getElementById('modal-qr-code').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(item.pixKey)}`;
-
-    if (item.reservadoPor) {
-        document.getElementById('modalReservadoPor').textContent = item.reservadoPor;
-        document.getElementById('modalMensagemRecado').textContent = item.mensagem || "Sem mensagem";
-        document.getElementById('botoes-acao-pix').classList.remove('hidden');
-    } else {
-        document.getElementById('modalReservadoPor').textContent = "Ainda não reservado";
-        document.getElementById('modalMensagemRecado').textContent = "";
-        document.getElementById('botoes-acao-pix').classList.add('hidden');
+window.openEditModal = function(giftId) {
+    if(!isAdmin) { alert("❌ Acesso restrito!"); return; }
+    const gift = giftsData.find(g => g.id === giftId);
+    if(gift) {
+        document.getElementById('edit-modal-title').textContent = "Editar Presente";
+        editId.value = gift.id;
+        editName.value = gift.name;
+        editPrice.value = gift.price;
+        editIcon.value = gift.icon;
+        editImagem.value = gift.imagem || "";
+        editPixKey.value = gift.pixKey;
+        btnDelete.classList.remove('hidden');
+        editModal.classList.remove('hidden');
     }
-
-    document.getElementById('pix-modal').classList.remove('hidden');
 };
 
-window.abrirReserva = function(id, nome) {
-    const item = giftsData.find(g => g.id === id);
-    if (item && item.reservadoPor) return alert("⚠️ Este item já foi reservado!");
-
-    document.getElementById('reserva-id').value = id;
-    document.getElementById('reserva-nome-item').textContent = nome;
-    document.getElementById('reserva-nome').value = usuarioAtualNome;
-    document.getElementById('reserva-modal').classList.remove('hidden');
+window.openPixModal = function(giftId) {
+    const gift = giftsData.find(g => g.id === giftId);
+    if (!gift) return;
+    itemAtualId = giftId;
+    if(gift.reservadoPor) {
+        modalReservadoPor.textContent = gift.reservadoPor;
+        modalMensagemRecado.textContent = gift.mensagem || "Sem mensagem.";
+        botoesAcaoPix.classList.remove('hidden');
+    } else {
+        modalReservadoPor.textContent = "Ainda não reservado";
+        modalMensagemRecado.textContent = "";
+        botoesAcaoPix.classList.add('hidden');
+    }
+    modalGiftName.textContent = gift.name;
+    modalGiftValue.textContent = gift.price;
+    pixCopiaCola.textContent = gift.pixKey;
+    modalQrCode.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(gift.pixKey)}`;
+    pixModal.classList.remove('hidden');
 };
 
-window.confirmarReserva = function(e) {
-    e.preventDefault();
-    const id = document.getElementById('reserva-id').value;
-    const nome = document.getElementById('reserva-nome').value.trim();
-    const msg = document.getElementById('reserva-mensagem').value.trim();
+window.abrirReserva = function(giftId, nomeItem) {
+    const gift = giftsData.find(g => g.id === giftId);
+    if(gift && gift.reservadoPor) {
+        alert("⚠️ Este presente já foi escolhido por outra pessoa!");
+        return;
+    }
+    reservaId.value = giftId;
+    reservaNomeItem.textContent = nomeItem;
+    reservaNome.value = usuarioAtualNome;
+    reservaModal.classList.remove('hidden');
+};
 
-    db.ref(`gifts/${id}`).update({
-        reservadoPor: nome,
-        mensagem: msg,
-        status: 'reservado'
-    })
-    .then(() => {
+window.confirmarReserva = async function(event) {
+    event.preventDefault();
+    const id = reservaId.value;
+    const nomePessoa = reservaNome.value.trim();
+    const mensagemPessoa = reservaMensagem.value.trim();
+    try {
+        const itemRef = ref(db, `gifts/${id}`);
+        await update(itemRef, {
+            reservadoPor: nomePessoa,
+            mensagem: mensagemPessoa,
+            status: 'reservado'
+        });
+        registrarLog("RESERVA", `Item reservado por ${nomePessoa}`);
         alert("✅ Reserva confirmada!");
         closeModal('reserva-modal');
         openPixModal(id);
-    })
-    .catch(err => alert("❌ Erro: " + err.message));
+    } catch (erro) {
+        alert("❌ Erro ao reservar: " + erro.message);
+    }
 };
 
-window.confirmarCompra = function() {
-    if (!confirm("Confirmar que este item foi comprado?")) return;
-    db.ref(`gifts/${itemAtualId}`).update({ status: 'pago' })
-    .then(() => {
+window.confirmarCompra = async function() {
+    if(!itemAtualId) return;
+    if(!confirm("Tem certeza que deseja CONFIRMAR a compra?")) return;
+    try {
+        const itemRef = ref(db, `gifts/${itemAtualId}`);
+        await update(itemRef, { status: 'pago' });
+        registrarLog("VENDA", `Compra confirmada ID: ${itemAtualId}`);
         alert("✅ Compra confirmada!");
         closeModal('pix-modal');
-    });
+    } catch (erro) {
+        alert("❌ Erro: " + erro.message);
+    }
 };
 
-window.cancelarReserva = function() {
-    if (!confirm("Cancelar esta reserva?")) return;
-    db.ref(`gifts/${itemAtualId}`).update({
-        reservadoPor: null,
-        mensagem: null,
-        status: null
-    })
-    .then(() => {
+window.cancelarReserva = async function() {
+    if(!itemAtualId) return;
+    if(!confirm("Tem certeza que deseja CANCELAR esta reserva?")) return;
+    try {
+        const itemRef = ref(db, `gifts/${itemAtualId}`);
+        await update(itemRef, {
+            reservadoPor: null,
+            mensagem: null,
+            status: null
+        });
+        registrarLog("CANCELAMENTO", `Reserva cancelada`);
         alert("✅ Reserva cancelada!");
         closeModal('pix-modal');
-    });
+    } catch (erro) {
+        alert("❌ Erro: " + erro.message);
+    }
 };
 
-// ==============================================
-// ADMINISTRAÇÃO
-// ==============================================
-window.abrirListaCompras = function() {
-    if (!isAdmin) return;
+window.reativarItem = async function(giftId) {
+    if(!isAdmin) { alert("❌ Acesso restrito!"); return; }
+    if(!confirm("Deseja reativar este item?")) return;
+    try {
+        const itemRef = ref(db, `gifts/${giftId}`);
+        await update(itemRef, {
+            reservadoPor: null,
+            mensagem: null,
+            status: null
+        });
+        registrarLog("REATIVACAO", `Item reativado`);
+        alert("✅ Item reativado!");
+        renderGifts();
+    } catch (erro) {
+        alert("❌ Erro: " + erro.message);
+    }
+};
+
+window.abrirListaCompras = async function() {
+    if(!isAdmin) { alert("❌ Acesso restrito!"); return; }
+    const conteudo = document.getElementById('lista-compras-conteudo');
     const comprados = giftsData.filter(g => g.reservadoPor);
-    const html = comprados.length === 0 
-        ? "<p class='text-center text-gray-500'>Nenhum item reservado/comprado</p>"
-        : comprados.map(i => `
-            <div class="p-3 border-b">
-                <p class="font-bold">${i.name} - ${i.price}</p>
-                <p class="text-sm">Comprador: ${i.reservadoPor}</p>
-                <p class="text-sm italic">Recado: ${i.mensagem || '---'}</p>
-            </div>`).join('');
-    document.getElementById('lista-compras-conteudo').innerHTML = html;
+    conteudo.innerHTML = comprados.length === 0 ? "<p class='text-center text-gray-500'>Nenhum item comprado</p>" :
+        comprados.map(i => `
+        <div class="p-3 border rounded bg-white">
+            <p class="font-bold">${i.name} - ${i.price}</p>
+            <p class="text-sm">Comprador: ${i.reservadoPor}</p>
+            <p class="text-sm italic">Recado: ${i.mensagem || '---'}</p>
+            <p class="text-xs ${i.status==='pago'?'text-green-600':i.status==='reservado'?'text-orange-500':'text-blue-600'}">Status: ${i.status||'Reativado'}</p>
+        </div>`).join('');
     document.getElementById('lista-compras-modal').classList.remove('hidden');
 };
 
-window.abrirLogs = function() {
-    if (!isAdmin) return;
-    db.ref('logs').orderByKey().limitToLast(30).once('value').then(snap => {
+window.abrirLogs = async function() {
+    if(!isAdmin) { alert("❌ Acesso restrito!"); return; }
+    const conteudo = document.getElementById('logs-conteudo');
+    try {
+        const snap = await get(ref(db, 'logs'));
         const logs = [];
         snap.forEach(c => logs.unshift({id:c.key,...c.val()}));
-        const html = logs.length === 0 
-            ? "<p class='text-center text-gray-500'>Nenhum registro</p>"
-            : logs.map(l => `<div class="p-1 text-xs"><span class="text-gray-500">[${l.data} ${l.hora}]</span> <strong>${l.tipo}</strong>: ${l.descricao}</div>`).join('');
-        document.getElementById('logs-conteudo').innerHTML = html;
+        conteudo.innerHTML = logs.length === 0 ? "<p class='text-center text-gray-500'>Nenhum registro</p>" :
+            logs.map(l=>`<div class="p-2 border-b"><span class="text-xs text-gray-500">[${l.data} ${l.hora}]</span> <span class="font-semibold">${l.tipo}</span> ${l.descricao} <span class="text-xs">por ${l.usuario}</span></div>`).join('');
         document.getElementById('logs-modal').classList.remove('hidden');
-    });
+    } catch (erro) {
+        conteudo.innerHTML = "<p class='text-red-500'>Erro ao carregar</p>";
+    }
 };
 
 window.openSettingsModal = function() {
-    if (!isAdmin) return;
-    document.getElementById('cfg-login-title').value = siteConfig.loginTitle || "";
-    document.getElementById('cfg-login-subtitle').value = siteConfig.loginSubtitle || "";
-    document.getElementById('cfg-main-title').value = siteConfig.mainTitle || "";
-    document.getElementById('cfg-welcome-text').value = siteConfig.welcomeText || "";
-    document.getElementById('cfg-bg-image').value = siteConfig.backgroundImage || "";
-    document.getElementById('cfg-footer-text').value = siteConfig.footerText || "";
-    document.getElementById('settings-modal').classList.remove('hidden');
+    if(!isAdmin) { alert("❌ Acesso restrito!"); return; }
+    cfgLoginTitle.value = siteConfig.loginTitle || "";
+    cfgLoginSubtitle.value = siteConfig.loginSubtitle || "";
+    cfgMainTitle.value = siteConfig.mainTitle || "";
+    cfgWelcomeText.value = siteConfig.welcomeText || "";
+    cfgBgImage.value = siteConfig.backgroundImage || "";
+    cfgFooterText.value = siteConfig.footerText || "";
+    settingsModal.classList.remove('hidden');
 };
 
+// 🆕 ADICIONAR NOVO ADMIN
 window.abrirAdicionarAdmin = function() {
-    if (!isAdmin || auth.currentUser.uid !== MEU_UID) return alert("❌ Apenas você pode cadastrar novos admins!");
-    document.getElementById('admin-modal').classList.remove('hidden');
+    if(!isAdmin || auth.currentUser.uid !== UID_MESTRE) { 
+        alert("❌ Apenas o administrador principal pode cadastrar novos!"); 
+        return; 
+    }
+    adminModal.classList.remove('hidden');
 };
 
-window.cadastrarNovoAdmin = function(e) {
+window.cadastrarNovoAdmin = async function(e) {
     e.preventDefault();
-    const email = document.getElementById('novo-admin-email').value.trim();
-    const senha = document.getElementById('novo-admin-senha').value;
+    const email = novoAdminEmail.value.trim();
+    const senha = novoAdminSenha.value;
 
-    auth.createUserWithEmailAndPassword(email, senha)
-    .then(usuario => db.ref(`admins/${usuario.user.uid}`).set(true))
-    .then(() => {
-        alert("✅ Novo admin cadastrado!");
+    try {
+        // Cria a conta no Firebase Auth
+        const usuarioCriado = await createUserWithEmailAndPassword(auth, email, senha);
+        // Cadastra como ADMIN no banco
+        await set(ref(db, `admins/${usuarioCriado.user.uid}`), true);
+        
+        alert("✅ Novo administrador cadastrado com sucesso!");
         closeModal('admin-modal');
-    })
-    .catch(err => alert("❌ Erro: " + err.message));
+        novoAdminEmail.value = "";
+        novoAdminSenha.value = "";
+
+    } catch (erro) {
+        alert("❌ Erro: " + erro.message);
+    }
 };
 
-window.saveItem = function(e) {
+window.saveItem = async function(e) {
     e.preventDefault();
-    if (!isAdmin) return;
-    const dados = {
-        name: document.getElementById('edit-name').value.trim(),
-        price: document.getElementById('edit-price').value.trim(),
-        icon: document.getElementById('edit-icon').value.trim(),
-        imagem: document.getElementById('edit-imagem').value.trim(),
-        pixKey: document.getElementById('edit-pixkey').value.trim()
+    if(!isAdmin) return;
+    const item = {
+        name: editName.value.trim(),
+        price: editPrice.value.trim(),
+        icon: editIcon.value.trim(),
+        imagem: editImagem.value.trim(),
+        pixKey: editPixKey.value.trim()
     };
-
-    const id = document.getElementById('edit-id').value;
-    const ref = id ? db.ref(`gifts/${id}`) : db.ref('gifts').push();
-    ref.set(dados).then(() => closeModal('edit-modal'));
+    try {
+        if(editId.value) {
+            await update(ref(db, `gifts/${editId.value}`), item);
+            registrarLog("EDIÇÃO", `Item alterado: ${item.name}`, editId.value);
+        } else {
+            const novaRef = push(ref(db, 'gifts'));
+            await set(novaRef, item);
+            registrarLog("CRIAÇÃO", `Novo item: ${item.name}`, novaRef.key);
+        }
+        closeModal('edit-modal');
+    } catch (erro) {
+        alert("❌ Erro: " + erro.message);
+    }
 };
 
-window.deleteItem = function() {
-    if (!isAdmin || !confirm("Excluir este item?")) return;
-    db.ref(`gifts/${document.getElementById('edit-id').value}`).remove().then(() => closeModal('edit-modal'));
+window.deleteItem = async function() {
+    if(!isAdmin || !confirm("Excluir item permanentemente?")) return;
+    try {
+        const nome = giftsData.find(g=>g.id===editId.value)?.name;
+        await remove(ref(db, `gifts/${editId.value}`));
+        registrarLog("EXCLUSÃO", `Item excluído: ${nome}`, editId.value);
+        closeModal('edit-modal');
+    } catch (erro) {
+        alert("❌ Erro: " + erro.message);
+    }
 };
 
-window.saveSettings = function(e) {
+window.saveSettings = async function(e) {
     e.preventDefault();
-    if (!isAdmin) return;
+    if(!isAdmin) return;
     const dados = {
-        loginTitle: document.getElementById('cfg-login-title').value,
-        loginSubtitle: document.getElementById('cfg-login-subtitle').value,
-        mainTitle: document.getElementById('cfg-main-title').value,
-        welcomeText: document.getElementById('cfg-welcome-text').value,
-        backgroundImage: document.getElementById('cfg-bg-image').value,
-        footerText: document.getElementById('cfg-footer-text').value
+        loginTitle: cfgLoginTitle.value,
+        loginSubtitle: cfgLoginSubtitle.value,
+        mainTitle: cfgMainTitle.value,
+        welcomeText: cfgWelcomeText.value,
+        backgroundImage: cfgBgImage.value,
+        footerText: cfgFooterText.value
     };
-    db.ref('configuracoes').update(dados).then(() => closeModal('settings-modal'));
+    try {
+        await update(ref(db, 'configuracoes'), dados);
+        registrarLog("CONFIG", "Configurações alteradas");
+        closeModal('settings-modal');
+    } catch (erro) {
+        alert("❌ Erro: " + erro.message);
+    }
 };
 
-// ==============================================
-// FUNÇÕES DE APOIO
-// ==============================================
+document.addEventListener("DOMContentLoaded", () => {
+    // Carrega configurações
+    onValue(ref(db, 'configuracoes'), snap => {
+        siteConfig = snap.val() || {};
+        document.getElementById('login-title').textContent = siteConfig.loginTitle || "Lista de Presentes";
+        document.getElementById('login-subtitle').textContent = siteConfig.loginSubtitle || "Identifique-se para acessar";
+        document.getElementById('main-title').textContent = siteConfig.mainTitle || "Presentes";
+        footerText.textContent = siteConfig.footerText || "© 2026";
+        if(siteConfig.backgroundImage) paginaPrincipal.style.backgroundImage = `url(${siteConfig.backgroundImage})`;
+        if(usuarioAtualNome) atualizarSaudacao();
+    });
+
+    // ✅ CARREGA TODOS OS ITENS
+    onValue(ref(db, 'gifts'), snap => {
+        giftsData = [];
+        snap.forEach(childSnapshot => {
+            giftsData.push({
+                id: childSnapshot.key,
+                ...childSnapshot.val()
+            });
+        });
+        renderGifts();
+    });
+});
+
 function atualizarSaudacao() {
-    welcomeText.innerHTML = (siteConfig.welcomeText || "Olá, <span class='font-bold text-pink-600'>[NOME]</span>! Escolha um presente.")
-        .replace("[NOME]", usuarioAtualNome);
+    welcomeText.innerHTML = (siteConfig.welcomeText || "Olá, [NOME]! Escolha um item para presentear.")
+        .replace("[NOME]", `<span class="font-semibold text-pink-600">${usuarioAtualNome}</span>`);
 }
 
 function mostrarBotoesAdmin() {
@@ -374,45 +487,35 @@ function mostrarBotoesAdmin() {
     btnSettings.classList.remove('hidden');
     btnListaCompras.classList.remove('hidden');
     btnLogs.classList.remove('hidden');
-    btnAdicionarAdmin.classList.remove('hidden');
+    btnAdicionarAdmin.classList.remove('hidden'); // MOSTRA BOTÃO DE NOVO ADMIN
+}
+
+function registrarLog(tipo, descricao, itemId=null) {
+    const agora = new Date();
+    push(ref(db, 'logs'), {
+        tipo, descricao, itemId,
+        data: agora.toLocaleDateString('pt-BR'),
+        hora: agora.toLocaleTimeString('pt-BR'),
+        usuario: usuarioAtualNome
+    });
 }
 
 function renderGifts() {
-    if (!giftsGrid) return;
-    giftsGrid.innerHTML = giftsData.length === 0 
-        ? "<p class='text-center col-span-full p-8 bg-white/80 rounded-xl'>Nenhum presente cadastrado</p>"
-        : giftsData.map(item => `
-        <div class="card-item bg-white rounded-xl shadow p-6 relative ${item.reservadoPor ? 'reservado' : ''}">
-            ${isAdmin ? `<button onclick="openEditModal('${item.id}')" class="absolute top-2 right-10 text-gray-600 hover:text-pink-500">✏️</button>` : ''}
-            <div class="text-4xl mb-4">
-                <img src="${item.icon || 'https://cdn-icons-png.flaticon.com/512/3099/3099358.png'}" class="w-12 h-12 object-contain">
+    if(!giftsGrid) return;
+    giftsGrid.innerHTML = giftsData.length === 0 ? "<p class='text-center col-span-full bg-white/80 p-4 rounded'>Nenhum item cadastrado</p>" :
+        giftsData.map(item => `
+        <div class="card-item bg-white rounded-xl shadow p-6 relative ${item.reservadoPor?'reservado':''}">
+            <div class="card-overlay"></div>
+            ${isAdmin?`<button onclick="openEditModal('${item.id}')" class="absolute top-2 right-10 text-gray-700 hover:text-pink-600">✏️</button>`:''}
+            ${isAdmin && item.reservadoPor?`<button onclick="reativarItem('${item.id}')" class="absolute top-2 right-2 text-xs bg-blue-500 text-white px-2 py-1 rounded">🔄 Reativar</button>`:''}
+            <div class="text-4xl mb-4 bg-pink-50/80 p-3 rounded-xl inline-block">
+                <img src="${item.icon}" class="icon-img" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3099/3099358.png'">
             </div>
             <h3 class="font-bold text-lg">${item.name}</h3>
             <p class="text-pink-600 font-bold text-xl my-2">${item.price}</p>
-            <button onclick="${item.reservadoPor ? `openPixModal('${item.id}')` : `abrirReserva('${item.id}','${item.name.replace(/'/g, "\\'")}')`}" 
-                class="w-full py-2 rounded-lg font-semibold ${item.reservadoPor ? 'bg-gray-500 text-white' : 'bg-pink-500 hover:bg-pink-600 text-white'}">
-                ${item.reservadoPor ? 'Ver Detalhes' : 'Escolher este presente'}
+            <button onclick="${item.reservadoPor?`openPixModal('${item.id}')`:`abrirReserva('${item.id}','${item.name.replace(/'/g, "\\'")}')`}" 
+                class="w-full mt-2 py-2 rounded-lg font-semibold ${item.reservadoPor?'bg-gray-500/90 text-white':'bg-pink-500/90 hover:bg-pink-600 text-white'}">
+                ${item.reservadoPor?'Ver PIX/Recado':'Escolher este'}
             </button>
         </div>`).join('');
 }
-
-// ==============================================
-// INICIALIZAÇÃO
-// ==============================================
-document.addEventListener("DOMContentLoaded", () => {
-    db.ref('configuracoes').on('value', snap => {
-        siteConfig = snap.val() || {};
-        document.getElementById('login-title').textContent = siteConfig.loginTitle || "Lista de Presentes";
-        document.getElementById('login-subtitle').textContent = siteConfig.loginSubtitle || "Identifique-se";
-        document.getElementById('main-title').textContent = siteConfig.mainTitle || "Nossos Presentes";
-        footerText.textContent = siteConfig.footerText || "© 2026 - Todos os direitos reservados";
-        if (siteConfig.backgroundImage) paginaPrincipal.style.backgroundImage = `url(${siteConfig.backgroundImage})`;
-        if (usuarioAtualNome) atualizarSaudacao();
-    });
-
-    db.ref('gifts').on('value', snap => {
-        giftsData = [];
-        snap.forEach(c => giftsData.push({id:c.key, ...c.val()}));
-        renderGifts();
-    });
-});
