@@ -1,6 +1,4 @@
-// ==============================================
-// CONFIGURAÇÃO DO FIREBASE - COLE SEUS DADOS AQUI
-// ==============================================
+// CONFIGURAÇÃO DO FIREBASE
 const firebaseConfig = {
     apiKey: "SUA_API_KEY_AQUI",
     authDomain: "lista-sophia.firebaseapp.com",
@@ -11,23 +9,21 @@ const firebaseConfig = {
     appId: "1:123456789:web:abc123def456"
 };
 
-// Inicializa Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const auth = firebase.auth();
 const providerGoogle = new firebase.auth.GoogleAuthProvider();
 
-// SEU UID DE ADMIN - JÁ ESTÁ AQUI CORRETO
+// SEU UID CORRETO
 const MEU_UID = "lWScb6ixfRQRNBkPloMdKcGFHzS2";
 
-// VARIÁVEIS GLOBAIS
 let isAdmin = false;
 let giftsData = [];
 let siteConfig = {};
 let usuarioAtualNome = "";
 let itemAtualId = "";
 
-// ELEMENTOS DA TELA
+// ELEMENTOS
 const screenLogin = document.getElementById('screen-login');
 const screenAdminLogin = document.getElementById('screen-admin-login');
 const screenDashboard = document.getElementById('screen-dashboard');
@@ -42,17 +38,14 @@ const btnListaCompras = document.getElementById('btn-lista-compras');
 const btnLogs = document.getElementById('btn-logs');
 const btnAdicionarAdmin = document.getElementById('btn-adicionar-admin');
 
-// ==============================================
-// FUNÇÕES GERAIS
-// ==============================================
+// FUNÇÕES BÁSICAS
 window.closeModal = function(modalId) {
     document.getElementById(modalId).classList.add('hidden');
 };
 
 window.copyPixKey = function() {
-    const texto = document.getElementById('pix-copia-cola').textContent;
-    navigator.clipboard.writeText(texto)
-    .then(() => alert("✅ Código PIX copiado!"))
+    navigator.clipboard.writeText(document.getElementById('pix-copia-cola').textContent)
+    .then(() => alert("✅ Copiado!"))
     .catch(() => alert("❌ Erro ao copiar"));
 };
 
@@ -72,23 +65,20 @@ window.abrirRecuperarSenha = function() {
 
 window.enviarRecuperacao = function() {
     const email = document.getElementById('email-recuperacao').value.trim();
-    if (!email) return alert("Digite seu e-mail!");
+    if(!email) return alert("Digite o e-mail!");
     auth.sendPasswordResetEmail(email)
     .then(() => {
-        alert("✅ E-mail enviado! Verifique sua caixa de entrada.");
+        alert("✅ E-mail enviado!");
         closeModal('recuperar-senha-modal');
     })
     .catch(err => alert("❌ Erro: " + err.message));
 };
 
-// ==============================================
-// LOGIN - CORRIGIDO PARA RECONHECER SEU UID
-// ==============================================
+// LOGIN
 window.handleLogin = function(e) {
     e.preventDefault();
     const nome = document.getElementById('username').value.trim();
-    if (!nome) return alert("Digite seu nome!");
-    
+    if(!nome) return alert("Digite seu nome!");
     usuarioAtualNome = nome;
     isAdmin = false;
     atualizarSaudacao();
@@ -105,55 +95,39 @@ window.handleAdminLogin = function(e) {
     auth.signInWithEmailAndPassword(email, senha)
     .then(result => {
         const uid = result.user.uid;
-        
-        // AQUI ESTÁ A CORREÇÃO PRINCIPAL: RECONHECE SEU UID PRIMEIRO
-        if (uid === MEU_UID) {
+        if(uid === MEU_UID) {
             isAdmin = true;
             usuarioAtualNome = "Administrador";
             mostrarBotoesAdmin();
-            alert("✅ LOGADO COMO ADMINISTRADOR PRINCIPAL!");
         } else {
-            // Verifica se é admin cadastrado no banco
             return db.ref(`admins/${uid}`).once('value').then(snap => {
-                if (snap.exists()) {
-                    isAdmin = true;
-                    usuarioAtualNome = "Administrador";
-                    mostrarBotoesAdmin();
-                    alert("✅ LOGADO COMO ADMIN CADASTRADO!");
-                } else {
-                    isAdmin = false;
-                    alert("❌ Usuário comum, sem permissões de admin");
-                }
+                isAdmin = snap.exists();
+                if(isAdmin) mostrarBotoesAdmin();
             });
         }
-
         screenAdminLogin.classList.add('hidden');
         screenDashboard.classList.remove('hidden');
         atualizarSaudacao();
         renderGifts();
     })
-    .catch(err => alert("❌ Erro no login: " + err.message));
+    .catch(err => alert("❌ Erro: " + err.message));
 };
 
 window.loginComGoogle = function() {
     auth.signInWithPopup(providerGoogle)
     .then(result => {
         const uid = result.user.uid;
-        
-        // TAMBÉM CORRIGIDO PARA LOGIN COM GOOGLE
-        if (uid === MEU_UID) {
+        if(uid === MEU_UID) {
             isAdmin = true;
             usuarioAtualNome = result.user.displayName || "Administrador";
             mostrarBotoesAdmin();
-            alert("✅ LOGADO COM GOOGLE - ADMIN PRINCIPAL!");
         } else {
             return db.ref(`admins/${uid}`).once('value').then(snap => {
                 isAdmin = snap.exists();
                 usuarioAtualNome = result.user.displayName || "Usuário";
-                if (isAdmin) mostrarBotoesAdmin();
+                if(isAdmin) mostrarBotoesAdmin();
             });
         }
-
         screenAdminLogin.classList.add('hidden');
         screenDashboard.classList.remove('hidden');
         atualizarSaudacao();
@@ -163,7 +137,7 @@ window.loginComGoogle = function() {
 };
 
 window.handleLogout = function() {
-    auth.signOut().catch(() => {});
+    auth.signOut();
     isAdmin = false;
     usuarioAtualNome = "";
     screenDashboard.classList.add('hidden');
@@ -171,11 +145,9 @@ window.handleLogout = function() {
     document.getElementById('username').value = '';
 };
 
-// ==============================================
-// ITENS / PRESENTES
-// ==============================================
+// ITENS
 window.openNewItemModal = function() {
-    if (!isAdmin) return alert("❌ Acesso restrito!");
+    if(!isAdmin) return alert("❌ Acesso restrito!");
     document.getElementById('edit-modal-title').textContent = "Novo Presente";
     document.getElementById('edit-id').value = "";
     document.getElementById('edit-name').value = "";
@@ -188,10 +160,9 @@ window.openNewItemModal = function() {
 };
 
 window.openEditModal = function(id) {
-    if (!isAdmin) return alert("❌ Acesso restrito!");
+    if(!isAdmin) return alert("❌ Acesso restrito!");
     const item = giftsData.find(g => g.id === id);
-    if (!item) return;
-
+    if(!item) return;
     document.getElementById('edit-modal-title').textContent = "Editar Presente";
     document.getElementById('edit-id').value = item.id;
     document.getElementById('edit-name').value = item.name;
@@ -205,15 +176,14 @@ window.openEditModal = function(id) {
 
 window.openPixModal = function(id) {
     const item = giftsData.find(g => g.id === id);
-    if (!item) return;
+    if(!item) return;
     itemAtualId = id;
-
     document.getElementById('modal-gift-name').textContent = item.name;
     document.getElementById('modal-gift-value').textContent = item.price;
     document.getElementById('pix-copia-cola').textContent = item.pixKey;
     document.getElementById('modal-qr-code').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(item.pixKey)}`;
 
-    if (item.reservadoPor) {
+    if(item.reservadoPor) {
         document.getElementById('modalReservadoPor').textContent = item.reservadoPor;
         document.getElementById('modalMensagemRecado').textContent = item.mensagem || "Sem mensagem";
         document.getElementById('botoes-acao-pix').classList.remove('hidden');
@@ -222,14 +192,12 @@ window.openPixModal = function(id) {
         document.getElementById('modalMensagemRecado').textContent = "";
         document.getElementById('botoes-acao-pix').classList.add('hidden');
     }
-
     document.getElementById('pix-modal').classList.remove('hidden');
 };
 
 window.abrirReserva = function(id, nome) {
     const item = giftsData.find(g => g.id === id);
-    if (item && item.reservadoPor) return alert("⚠️ Este item já foi reservado!");
-
+    if(item && item.reservadoPor) return alert("⚠️ Já reservado!");
     document.getElementById('reserva-id').value = id;
     document.getElementById('reserva-nome-item').textContent = nome;
     document.getElementById('reserva-nome').value = usuarioAtualNome;
@@ -251,12 +219,11 @@ window.confirmarReserva = function(e) {
         alert("✅ Reserva confirmada!");
         closeModal('reserva-modal');
         openPixModal(id);
-    })
-    .catch(err => alert("❌ Erro: " + err.message));
+    });
 };
 
 window.confirmarCompra = function() {
-    if (!confirm("Confirmar que este item foi comprado?")) return;
+    if(!confirm("Confirmar compra?")) return;
     db.ref(`gifts/${itemAtualId}`).update({ status: 'pago' })
     .then(() => {
         alert("✅ Compra confirmada!");
@@ -265,51 +232,36 @@ window.confirmarCompra = function() {
 };
 
 window.cancelarReserva = function() {
-    if (!confirm("Cancelar esta reserva?")) return;
-    db.ref(`gifts/${itemAtualId}`).update({
-        reservadoPor: null,
-        mensagem: null,
-        status: null
-    })
+    if(!confirm("Cancelar reserva?")) return;
+    db.ref(`gifts/${itemAtualId}`).update({ reservadoPor: null, mensagem: null, status: null })
     .then(() => {
         alert("✅ Reserva cancelada!");
         closeModal('pix-modal');
     });
 };
 
-// ==============================================
-// ADMINISTRAÇÃO
-// ==============================================
+// ADMIN
 window.abrirListaCompras = function() {
-    if (!isAdmin) return;
+    if(!isAdmin) return;
     const comprados = giftsData.filter(g => g.reservadoPor);
-    const html = comprados.length === 0 
-        ? "<p class='text-center text-gray-500'>Nenhum item reservado/comprado</p>"
-        : comprados.map(i => `
-            <div class="p-3 border-b">
-                <p class="font-bold">${i.name} - ${i.price}</p>
-                <p class="text-sm">Comprador: ${i.reservadoPor}</p>
-                <p class="text-sm italic">Recado: ${i.mensagem || '---'}</p>
-            </div>`).join('');
+    const html = comprados.length === 0 ? "<p class='text-center p-4'>Nenhum item comprado</p>" : comprados.map(i => `<div class="p-2 border-b"><b>${i.name}</b> | Comprador: ${i.reservadoPor}<br><small>${i.mensagem||''}</small></div>`).join('');
     document.getElementById('lista-compras-conteudo').innerHTML = html;
     document.getElementById('lista-compras-modal').classList.remove('hidden');
 };
 
 window.abrirLogs = function() {
-    if (!isAdmin) return;
-    db.ref('logs').orderByKey().limitToLast(30).once('value').then(snap => {
+    if(!isAdmin) return;
+    db.ref('logs').orderByKey().limitToLast(20).once('value').then(snap => {
         const logs = [];
         snap.forEach(c => logs.unshift({id:c.key,...c.val()}));
-        const html = logs.length === 0 
-            ? "<p class='text-center text-gray-500'>Nenhum registro</p>"
-            : logs.map(l => `<div class="p-1 text-xs"><span class="text-gray-500">[${l.data} ${l.hora}]</span> <strong>${l.tipo}</strong>: ${l.descricao}</div>`).join('');
+        const html = logs.length === 0 ? "<p class='text-center p-4'>Nenhum registro</p>" : logs.map(l => `<div class="text-xs p-1"><span class="text-gray-500">[${l.data} ${l.hora}]</span> <b>${l.tipo}</b>: ${l.descricao}</div>`).join('');
         document.getElementById('logs-conteudo').innerHTML = html;
         document.getElementById('logs-modal').classList.remove('hidden');
     });
 };
 
 window.openSettingsModal = function() {
-    if (!isAdmin) return;
+    if(!isAdmin) return;
     document.getElementById('cfg-login-title').value = siteConfig.loginTitle || "";
     document.getElementById('cfg-login-subtitle').value = siteConfig.loginSubtitle || "";
     document.getElementById('cfg-main-title').value = siteConfig.mainTitle || "";
@@ -320,10 +272,7 @@ window.openSettingsModal = function() {
 };
 
 window.abrirAdicionarAdmin = function() {
-    // SÓ VOCÊ PODE CADASTRAR NOVOS ADMINS
-    if (!isAdmin || (auth.currentUser && auth.currentUser.uid !== MEU_UID)) {
-        return alert("❌ Apenas o administrador principal pode cadastrar novos admins!");
-    }
+    if(!isAdmin || auth.currentUser.uid !== MEU_UID) return alert("❌ Apenas você pode cadastrar!");
     document.getElementById('admin-modal').classList.remove('hidden');
 };
 
@@ -331,19 +280,17 @@ window.cadastrarNovoAdmin = function(e) {
     e.preventDefault();
     const email = document.getElementById('novo-admin-email').value.trim();
     const senha = document.getElementById('novo-admin-senha').value;
-
     auth.createUserWithEmailAndPassword(email, senha)
     .then(usuario => db.ref(`admins/${usuario.user.uid}`).set(true))
     .then(() => {
-        alert("✅ Novo admin cadastrado com sucesso!");
+        alert("✅ Cadastrado!");
         closeModal('admin-modal');
-    })
-    .catch(err => alert("❌ Erro: " + err.message));
+    });
 };
 
 window.saveItem = function(e) {
     e.preventDefault();
-    if (!isAdmin) return;
+    if(!isAdmin) return;
     const dados = {
         name: document.getElementById('edit-name').value.trim(),
         price: document.getElementById('edit-price').value.trim(),
@@ -351,20 +298,19 @@ window.saveItem = function(e) {
         imagem: document.getElementById('edit-imagem').value.trim(),
         pixKey: document.getElementById('edit-pixkey').value.trim()
     };
-
     const id = document.getElementById('edit-id').value;
     const ref = id ? db.ref(`gifts/${id}`) : db.ref('gifts').push();
     ref.set(dados).then(() => closeModal('edit-modal'));
 };
 
 window.deleteItem = function() {
-    if (!isAdmin || !confirm("Excluir este item?")) return;
+    if(!isAdmin || !confirm("Excluir?")) return;
     db.ref(`gifts/${document.getElementById('edit-id').value}`).remove().then(() => closeModal('edit-modal'));
 };
 
 window.saveSettings = function(e) {
     e.preventDefault();
-    if (!isAdmin) return;
+    if(!isAdmin) return;
     const dados = {
         loginTitle: document.getElementById('cfg-login-title').value,
         loginSubtitle: document.getElementById('cfg-login-subtitle').value,
@@ -376,12 +322,9 @@ window.saveSettings = function(e) {
     db.ref('configuracoes').update(dados).then(() => closeModal('settings-modal'));
 };
 
-// ==============================================
-// FUNÇÕES DE APOIO
-// ==============================================
+// APOIO
 function atualizarSaudacao() {
-    welcomeText.innerHTML = (siteConfig.welcomeText || "Olá, <span class='font-bold text-pink-600'>[NOME]</span>! Escolha um presente.")
-        .replace("[NOME]", usuarioAtualNome);
+    welcomeText.innerHTML = (siteConfig.welcomeText || "Olá, [NOME]!").replace("[NOME]", `<span class='font-bold text-pink-600'>${usuarioAtualNome}</span>`);
 }
 
 function mostrarBotoesAdmin() {
@@ -393,36 +336,29 @@ function mostrarBotoesAdmin() {
 }
 
 function renderGifts() {
-    if (!giftsGrid) return;
-    giftsGrid.innerHTML = giftsData.length === 0 
-        ? "<p class='text-center col-span-full p-8 bg-white/80 rounded-xl'>Nenhum presente cadastrado</p>"
-        : giftsData.map(item => `
+    if(!giftsGrid) return;
+    giftsGrid.innerHTML = giftsData.length === 0 ? "<p class='text-center col-span-full p-8'>Nenhum item cadastrado</p>" : giftsData.map(item => `
         <div class="card-item bg-white rounded-xl shadow p-6 relative ${item.reservadoPor ? 'reservado' : ''}">
-            ${isAdmin ? `<button onclick="openEditModal('${item.id}')" class="absolute top-2 right-10 text-gray-600 hover:text-pink-500">✏️</button>` : ''}
-            <div class="text-4xl mb-4">
-                <img src="${item.icon || 'https://cdn-icons-png.flaticon.com/512/3099/3099358.png'}" class="w-12 h-12 object-contain">
-            </div>
+            ${isAdmin ? `<button onclick="openEditModal('${item.id}')" class="absolute top-2 right-10 text-gray-600">✏️</button>` : ''}
+            <div class="text-4xl mb-4"><img src="${item.icon||'https://cdn-icons-png.flaticon.com/512/3099/3099358.png'}" class="w-12 h-12"></div>
             <h3 class="font-bold text-lg">${item.name}</h3>
             <p class="text-pink-600 font-bold text-xl my-2">${item.price}</p>
-            <button onclick="${item.reservadoPor ? `openPixModal('${item.id}')` : `abrirReserva('${item.id}','${item.name.replace(/'/g, "\\'")}')`}" 
-                class="w-full py-2 rounded-lg font-semibold ${item.reservadoPor ? 'bg-gray-500 text-white' : 'bg-pink-500 hover:bg-pink-600 text-white'}">
-                ${item.reservadoPor ? 'Ver Detalhes' : 'Escolher este presente'}
+            <button onclick="${item.reservadoPor ? `openPixModal('${item.id}')` : `abrirReserva('${item.id}','${item.name.replace(/'/g, "\\'")}')`}" class="w-full py-2 rounded-lg font-semibold ${item.reservadoPor ? 'bg-gray-500 text-white' : 'bg-pink-500 text-white'}">
+                ${item.reservadoPor ? 'Ver PIX' : 'Escolher este'}
             </button>
         </div>`).join('');
 }
 
-// ==============================================
-// INICIALIZAÇÃO
-// ==============================================
+// INICIO
 document.addEventListener("DOMContentLoaded", () => {
     db.ref('configuracoes').on('value', snap => {
         siteConfig = snap.val() || {};
         document.getElementById('login-title').textContent = siteConfig.loginTitle || "Lista de Presentes";
         document.getElementById('login-subtitle').textContent = siteConfig.loginSubtitle || "Identifique-se";
-        document.getElementById('main-title').textContent = siteConfig.mainTitle || "Nossos Presentes";
-        footerText.textContent = siteConfig.footerText || "© 2026 - Todos os direitos reservados";
-        if (siteConfig.backgroundImage) paginaPrincipal.style.backgroundImage = `url(${siteConfig.backgroundImage})`;
-        if (usuarioAtualNome) atualizarSaudacao();
+        document.getElementById('main-title').textContent = siteConfig.mainTitle || "Presentes";
+        footerText.textContent = siteConfig.footerText || "© 2026";
+        if(siteConfig.backgroundImage) paginaPrincipal.style.backgroundImage = `url(${siteConfig.backgroundImage})`;
+        if(usuarioAtualNome) atualizarSaudacao();
     });
 
     db.ref('gifts').on('value', snap => {
