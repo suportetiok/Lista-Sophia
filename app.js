@@ -1,7 +1,7 @@
 import { db, auth, providerGoogle, ref, onValue, set, update, push, remove, get, signInWithEmailAndPassword, signInWithPopup, signOut, onAuthStateChanged } from './firebase.js';
 
-// ✅ SEU UID QUE VOCÊ ME PASSOU - NÃO MUDE AQUI
-const UID_ADMIN_CORRETO = "lWScb6ixfRQRNBkPloMdKcGFHzS2";
+// ✅ SEU UID ADMIN CORRETO DO PROJETO lista-sophia
+const UID_ADMIN_CORRETO = "10075688372";
 
 // Variáveis Globais
 let isAdmin = false;
@@ -403,6 +403,7 @@ function registrarLog(tipo, descricao, itemId=null) {
   } catch (e) {}
 }
 
+// ✅ FUNÇÃO DE RENDERIZAÇÃO COM LÁPIS VISÍVEL E FUNCIONAL
 function renderGifts() {
   if(!giftsGrid) return;
   giftsGrid.innerHTML = giftsData.length === 0 
@@ -410,15 +411,38 @@ function renderGifts() {
     : giftsData.map(item => `
       <div class="card-item bg-white rounded-xl shadow p-6 relative ${item.reservadoPor?'reservado':''}">
         <div class="card-overlay"></div>
-        ${isAdmin?`<button onclick="openEditModal('${item.id}')" class="absolute top-2 right-10 text-gray-700 hover:text-pink-600">✏️</button>`:''}
-        ${isAdmin && item.reservadoPor?`<button onclick="reativarItem('${item.id}')" class="absolute top-2 right-2 text-xs bg-blue-500 text-white px-2 py-1 rounded">🔄 Reativar</button>`:''}
+
+        <!-- ✏️ LÁPIS DE EDITAR - SÓ APARECE SE FOR ADMIN -->
+        ${isAdmin ? `
+        <button 
+          onclick="openEditModal('${item.id}')" 
+          class="absolute top-3 right-12 text-gray-700 hover:text-pink-600 text-xl z-20 bg-white/80 rounded-full w-8 h-8 flex items-center justify-center shadow"
+          title="Editar item">
+          ✏️
+        </button>` : ''}
+
+        <!-- 🔄 BOTÃO DE REATIVAR - SÓ ADMIN VÊ SE ESTIVER RESERVADO -->
+        ${isAdmin && item.reservadoPor ? `
+        <button 
+          onclick="reativarItem('${item.id}')" 
+          class="absolute top-3 right-3 text-xs bg-blue-500 text-white px-2 py-1 rounded z-20 shadow"
+          title="Reativar item">
+          🔄
+        </button>` : ''}
+
         <div class="text-4xl mb-4 bg-pink-50/80 p-3 rounded-xl inline-block">
-          <img src="${item.icon}" style="width: 48px; height: 48px; object-fit: contain;" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3099/3099358.png'">
+          <img 
+            src="${item.icon}" 
+            style="width: 48px; height: 48px; object-fit: contain;" 
+            onerror="this.src='https://cdn-icons-png.flaticon.com/512/3099/3099358.png'">
         </div>
+
         <h3 class="font-bold text-lg">${item.name}</h3>
         <p class="text-pink-600 font-bold text-xl my-2">${item.price}</p>
-        <button onclick="${item.reservadoPor?`openPixModal('${item.id}')`:`abrirReserva('${item.id}','${item.name.replace(/'/g, "\\'")}')`}" 
-        class="w-full mt-2 py-2 rounded-lg font-semibold ${item.reservadoPor?'bg-gray-500/90 text-white':'bg-pink-500/90 hover:bg-pink-600 text-white'}">
+
+        <button 
+          onclick="${item.reservadoPor?`openPixModal('${item.id}')`:`abrirReserva('${item.id}','${item.name.replace(/'/g, "\\'")}')`}" 
+          class="w-full mt-2 py-2 rounded-lg font-semibold ${item.reservadoPor?'bg-gray-500/90 text-white':'bg-pink-500/90 hover:bg-pink-600 text-white'}">
           ${item.reservadoPor?'Ver PIX/Recado':'Escolher este'}
         </button>
       </div>`).join('');
@@ -446,6 +470,6 @@ document.addEventListener("DOMContentLoaded", () => {
         ...childSnapshot.val()
       });
     });
-    renderGifts(); // ✅ Agora está DENTRO do onValue, depois que os dados chegam
+    renderGifts();
   });
 });
