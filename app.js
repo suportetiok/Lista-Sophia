@@ -1,7 +1,7 @@
 import { db, auth, providerGoogle, ref, onValue, set, update, push, remove, get, signInWithEmailAndPassword, signInWithPopup, signOut, onAuthStateChanged } from './firebase.js';
 
-// ✅ SEU UID EXATO - NÃO MUDE NADA AQUI
-const MEU_UID = "lWScb6ixfRQRNBkPloMdKcGFHzS2";
+// ✅ SEU UID QUE VOCÊ ME PASSOU - NÃO MUDE AQUI
+const UID_ADMIN_CORRETO = "lWScb6ixfRQRNBkPloMdKcGFHzS2";
 
 // Variáveis Globais
 let isAdmin = false;
@@ -87,15 +87,18 @@ window.handleAdminLogin = async function(event) {
     try {
         const resultado = await signInWithEmailAndPassword(auth, email, senha);
         
-        // ✅ VERIFICAÇÃO FORÇADA: SE FOR SEU UID = ADMIN
-        if (resultado.user.uid === MEU_UID) {
+        // 🔍 MOSTRA O UID REAL LOGADO - PARA CONFIRMAR
+        alert("🔍 SEU UID LOGADO: " + resultado.user.uid + "\n✅ UID ADMIN CADASTRADO: " + UID_ADMIN_CORRETO);
+
+        // ✅ VERIFICAÇÃO EXATA
+        if (resultado.user.uid === UID_ADMIN_CORRETO) {
             isAdmin = true;
             usuarioAtualNome = "Administrador";
             mostrarBotoesAdmin();
             alert("✅ LOGADO COMO ADMINISTRADOR!");
         } else {
             isAdmin = false;
-            usuarioAtualNome = resultado.user.displayName || "Usuário";
+            alert("❌ NÃO É ADMIN - UID DIFERENTE");
         }
 
         screenAdminLogin.classList.add('hidden');
@@ -113,8 +116,11 @@ window.loginComGoogle = async function() {
     try {
         const resultado = await signInWithPopup(auth, providerGoogle);
 
-        // ✅ MESMA REGRA PARA GOOGLE
-        if (resultado.user.uid === MEU_UID) {
+        // 🔍 MOSTRA O UID REAL LOGADO - PARA CONFIRMAR
+        alert("🔍 SEU UID LOGADO: " + resultado.user.uid + "\n✅ UID ADMIN CADASTRADO: " + UID_ADMIN_CORRETO);
+
+        // ✅ VERIFICAÇÃO EXATA
+        if (resultado.user.uid === UID_ADMIN_CORRETO) {
             isAdmin = true;
             usuarioAtualNome = resultado.user.displayName || "Administrador";
             mostrarBotoesAdmin();
@@ -122,6 +128,7 @@ window.loginComGoogle = async function() {
         } else {
             isAdmin = false;
             usuarioAtualNome = resultado.user.displayName || "Usuário";
+            alert("✅ Acesso liberado como usuário comum");
         }
 
         screenAdminLogin.classList.add('hidden');
@@ -403,7 +410,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if(usuarioAtualNome) atualizarSaudacao();
     });
 
-    // ✅ CARREGA TODOS OS ITENS - 100% CORRIGIDO
+    // ✅ CARREGA TODOS OS ITENS - CORRIGIDO
     onValue(ref(db, 'gifts'), snap => {
         giftsData = [];
         snap.forEach(childSnapshot => {
