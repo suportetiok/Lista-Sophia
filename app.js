@@ -87,6 +87,7 @@ window.handleAdminLogin = async function(event) {
       usuarioAtualNome = "Administrador";
       mostrarBotoesAdmin();
       alert("✅ LOGADO COMO ADMINISTRADOR!");
+      recarregarItens(); // ✅ Força atualizar os itens agora que é admin
     } else {
       isAdmin = false;
       alert("❌ NÃO É ADMIN - UID DIFERENTE");
@@ -108,6 +109,7 @@ window.loginComGoogle = async function() {
       usuarioAtualNome = resultado.user.displayName || "Administrador";
       mostrarBotoesAdmin();
       alert("✅ LOGADO COM GOOGLE COMO ADMIN!");
+      recarregarItens(); // ✅ Força atualizar os itens agora que é admin
     } else {
       isAdmin = false;
       usuarioAtualNome = resultado.user.displayName || "Usuário";
@@ -403,7 +405,7 @@ function registrarLog(tipo, descricao, itemId=null) {
   } catch (e) {}
 }
 
-// ✅ FUNÇÃO DE RENDERIZAÇÃO COM LÁPIS VISÍVEL E FUNCIONAL
+// ✅ FUNÇÃO DE RENDERIZAÇÃO COM LÁPIS GARANTIDO
 function renderGifts() {
   if(!giftsGrid) return;
   giftsGrid.innerHTML = giftsData.length === 0 
@@ -448,20 +450,8 @@ function renderGifts() {
       </div>`).join('');
 }
 
-// CARREGAMENTO INICIAL
-document.addEventListener("DOMContentLoaded", () => {
-  // Carrega configurações
-  onValue(ref(db, 'configuracoes'), snap => {
-    siteConfig = snap.val() || {};
-    document.getElementById('login-title').textContent = siteConfig.loginTitle || "Lista de Presentes";
-    document.getElementById('login-subtitle').textContent = siteConfig.loginSubtitle || "Identifique-se para acessar";
-    document.getElementById('main-title').textContent = siteConfig.mainTitle || "Presentes";
-    footerText.textContent = siteConfig.footerText || "© 2026";
-    if(siteConfig.backgroundImage) paginaPrincipal.style.backgroundImage = `url(${siteConfig.backgroundImage})`;
-    if(usuarioAtualNome) atualizarSaudacao();
-  });
-
-  // Carrega todos os itens
+// ✅ FUNÇÃO SEPARADA PARA RECARREGAR ITENS QUANDO PRECISAR
+function recarregarItens() {
   onValue(ref(db, 'gifts'), snap => {
     giftsData = [];
     snap.forEach(childSnapshot => {
@@ -472,4 +462,33 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     renderGifts();
   });
+}
+
+// ✅ CARREGAMENTO INICIAL: VERIFICA LOGIN ANTES DE TUDO
+document.addEventListener("DOMContentLoaded", () => {
+
+  // 🔑 PASSO 1: VERIFICA SE JÁ ESTÁ LOGADO E SE É ADMIN (CORREÇÃO PRINCIPAL)
+  onAuthStateChanged(auth, (usuario) => {
+    if (usuario && usuario.uid === UID_ADMIN_CORRETO) {
+      isAdmin = true;
+      usuarioAtualNome = usuario.displayName || "Administrador";
+      mostrarBotoesAdmin();
+    } else {
+      isAdmin = false;
+    }
+    // Só carrega os itens DEPOIS de saber se é admin ou não
+    recarregarItens();
+  });
+
+  // PASSO 2: Carrega configurações do site
+  onValue(ref(db, 'configuracoes'), snap => {
+    siteConfig = snap.val() || {};
+    document.getElementById('login-title').textContent = siteConfig.loginTitle || "Lista de Presentes";
+    document.getElementById('login-subtitle').textContent = siteConfig.loginSubtitle || "Identifique-se para acessar";
+    document.getElementById('main-title').textContent = siteConfig.mainTitle || "Presentes";
+    footerText.textContent = siteConfig.footerText || "© 2026";
+    if(siteConfig.backgroundImage) paginaPrincipal.style.backgroundImage = `url(${siteConfig.backgroundImage})`;
+    if(usuarioAtualNome) atualizarSaudacao();
+  });
+
 });
