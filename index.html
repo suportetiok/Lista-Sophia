@@ -1,278 +1,419 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lista de Presentes</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#EC4899',
-                        secondary: '#F472B6',
-                        light: '#FDF2F8',
-                        dark: '#831843'
-                    }
+// CONFIGURAÇÃO DO FIREBASE - COLE A SUA AQUI
+const firebaseConfig = {
+    apiKey: "SUA_API_KEY",
+    authDomain: "SEU_DOMINIO",
+    databaseURL: "https://lista-sophia-default-rtdb.firebaseio.com/",
+    projectId: "SEU_PROJETO",
+    storageBucket: "SEU_BUCKET",
+    messagingSenderId: "SEU_SENDER_ID",
+    appId: "SUA_APP_ID"
+};
+
+// Inicializa Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const auth = firebase.auth();
+const providerGoogle = new firebase.auth.GoogleAuthProvider();
+
+// ✅ SEU UID ADMIN
+const MEU_UID = "lWScb6ixfRQRNBkPloMdKcGFHzS2";
+
+// Variáveis Globais
+let isAdmin = false;
+let giftsData = [];
+let siteConfig = {};
+let usuarioAtualNome = "";
+let itemAtualId = "";
+
+// ELEMENTOS
+const screenLogin = document.getElementById('screen-login');
+const screenAdminLogin = document.getElementById('screen-admin-login');
+const screenDashboard = document.getElementById('screen-dashboard');
+const giftsGrid = document.getElementById('gifts-grid');
+const welcomeText = document.getElementById('welcomeText');
+const footerText = document.getElementById('footer-text');
+const paginaPrincipal = document.getElementById('pagina-principal');
+const btnNewItem = document.getElementById('btn-new-item');
+const btnSettings = document.getElementById('btn-settings');
+const btnListaCompras = document.getElementById('btn-lista-compras');
+const btnLogs = document.getElementById('btn-logs');
+const btnAdicionarAdmin = document.getElementById('btn-adicionar-admin');
+
+// FUNÇÕES GLOBAIS
+window.closeModal = function(modalId) {
+    document.getElementById(modalId).classList.add('hidden');
+};
+
+window.copyPixKey = function() {
+    navigator.clipboard.writeText(document.getElementById('pix-copia-cola').textContent)
+    .then(() => alert("✅ Código copiado!"))
+    .catch(() => alert("❌ Erro ao copiar"));
+};
+
+window.showAdminLogin = function() {
+    screenLogin.classList.add('hidden');
+    screenAdminLogin.classList.remove('hidden');
+};
+
+window.hideAdminLogin = function() {
+    screenAdminLogin.classList.add('hidden');
+    screenLogin.classList.remove('hidden');
+};
+
+window.abrirRecuperarSenha = function() {
+    document.getElementById('recuperar-senha-modal').classList.remove('hidden');
+};
+
+window.enviarRecuperacao = function() {
+    const email = document.getElementById('email-recuperacao').value.trim();
+    if(!email) return alert("Digite o e-mail!");
+    auth.sendPasswordResetEmail(email)
+    .then(() => {
+        alert("✅ E-mail enviado! Verifique sua caixa de entrada.");
+        closeModal('recuperar-senha-modal');
+    })
+    .catch(err => alert("❌ Erro: " + err.message));
+};
+
+window.handleLogin = function(e) {
+    e.preventDefault();
+    const nome = document.getElementById('username').value.trim();
+    if(!nome) return alert("Digite seu nome!");
+    usuarioAtualNome = nome;
+    isAdmin = false;
+    atualizarSaudacao();
+    screenLogin.classList.add('hidden');
+    screenDashboard.classList.remove('hidden');
+    renderGifts();
+};
+
+window.handleAdminLogin = function(e) {
+    e.preventDefault();
+    const email = document.getElementById('admin-email').value.trim();
+    const senha = document.getElementById('admin-password').value;
+
+    auth.signInWithEmailAndPassword(email, senha)
+    .then(result => {
+        const uid = result.user.uid;
+        // DIAGNÓSTICO
+        alert(`🔍 UID LOGADO: ${uid}\nUID ADMIN: ${MEU_UID}\nIGUAIS? ${uid === MEU_UID ? 'SIM ✅' : 'NÃO ❌'}`);
+        
+        if(uid === MEU_UID) {
+            isAdmin = true;
+            usuarioAtualNome = "Administrador";
+            mostrarBotoesAdmin();
+            alert("✅ LOGADO COMO ADMIN!");
+        } else {
+            return db.ref(`admins/${uid}`).once('value').then(snap => {
+                if(snap.exists()) {
+                    isAdmin = true;
+                    usuarioAtualNome = "Administrador";
+                    mostrarBotoesAdmin();
+                    alert("✅ ADMIN CADASTRADO NO BANCO!");
+                } else {
+                    isAdmin = false;
+                    alert("❌ USUÁRIO COMUM");
                 }
-            }
+            });
         }
-    </script>
-    <style>
-        .hidden { display: none !important; }
-        .modal-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 999;
-            padding: 1rem;
+
+        screenAdminLogin.classList.add('hidden');
+        screenDashboard.classList.remove('hidden');
+        atualizarSaudacao();
+        renderGifts();
+    })
+    .catch(err => alert("❌ Erro: " + err.message));
+};
+
+window.loginComGoogle = function() {
+    auth.signInWithPopup(providerGoogle)
+    .then(result => {
+        const uid = result.user.uid;
+        alert(`🔍 UID GOOGLE: ${uid}\nUID ADMIN: ${MEU_UID}\nIGUAIS? ${uid === MEU_UID ? 'SIM ✅' : 'NÃO ❌'}`);
+
+        if(uid === MEU_UID) {
+            isAdmin = true;
+            usuarioAtualNome = result.user.displayName || "Administrador";
+            mostrarBotoesAdmin();
+            alert("✅ LOGADO GOOGLE ADMIN!");
+        } else {
+            return db.ref(`admins/${uid}`).once('value').then(snap => {
+                isAdmin = snap.exists();
+                usuarioAtualNome = result.user.displayName || "Usuário";
+                if(isAdmin) mostrarBotoesAdmin();
+            });
         }
-        .card-item {
-            position: relative;
-            overflow: hidden;
-        }
-        .reservado {
-            opacity: 0.7;
-            background: #f3f4f6;
-        }
-    </style>
-</head>
-<body class="bg-gradient-to-br from-pink-100 to-purple-200 min-h-screen font-sans">
 
-    <!-- Tela de Login -->
-    <section id="screen-login" class="fixed inset-0 z-40 flex items-center justify-center p-4 bg-gradient-to-br from-pink-100 to-purple-200">
-        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
-            <div class="text-center mb-8">
-                <h1 id="login-title" class="text-3xl font-bold text-primary mb-2">Lista de Presentes</h1>
-                <p id="login-subtitle" class="text-gray-600">Identifique-se para acessar</p>
+        screenAdminLogin.classList.add('hidden');
+        screenDashboard.classList.remove('hidden');
+        atualizarSaudacao();
+        renderGifts();
+    })
+    .catch(err => alert("❌ Erro Google: " + err.message));
+};
+
+window.handleLogout = function() {
+    auth.signOut();
+    isAdmin = false;
+    usuarioAtualNome = "";
+    screenDashboard.classList.add('hidden');
+    screenLogin.classList.remove('hidden');
+    document.getElementById('username').value = '';
+};
+
+window.openNewItemModal = function() {
+    if(!isAdmin) return alert("❌ Acesso restrito!");
+    document.getElementById('edit-modal-title').textContent = "Novo Presente";
+    document.getElementById('edit-id').value = "";
+    document.getElementById('edit-name').value = "";
+    document.getElementById('edit-price').value = "";
+    document.getElementById('edit-icon').value = "";
+    document.getElementById('edit-imagem').value = "";
+    document.getElementById('edit-pixkey').value = "";
+    document.getElementById('btn-delete').classList.add('hidden');
+    document.getElementById('edit-modal').classList.remove('hidden');
+};
+
+window.openEditModal = function(id) {
+    if(!isAdmin) return alert("❌ Acesso restrito!");
+    const item = giftsData.find(g => g.id === id);
+    if(!item) return;
+    document.getElementById('edit-modal-title').textContent = "Editar Presente";
+    document.getElementById('edit-id').value = item.id;
+    document.getElementById('edit-name').value = item.name;
+    document.getElementById('edit-price').value = item.price;
+    document.getElementById('edit-icon').value = item.icon || "";
+    document.getElementById('edit-imagem').value = item.imagem || "";
+    document.getElementById('edit-pixkey').value = item.pixKey;
+    document.getElementById('btn-delete').classList.remove('hidden');
+    document.getElementById('edit-modal').classList.remove('hidden');
+};
+
+window.openPixModal = function(id) {
+    const item = giftsData.find(g => g.id === id);
+    if(!item) return;
+    itemAtualId = id;
+
+    document.getElementById('modal-gift-name').textContent = item.name;
+    document.getElementById('modal-gift-value').textContent = item.price;
+    document.getElementById('pix-copia-cola').textContent = item.pixKey;
+    document.getElementById('modal-qr-code').src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(item.pixKey)}`;
+
+    if(item.reservadoPor) {
+        document.getElementById('modalReservadoPor').textContent = item.reservadoPor;
+        document.getElementById('modalMensagemRecado').textContent = item.mensagem || "Sem mensagem";
+        document.getElementById('botoes-acao-pix').classList.remove('hidden');
+    } else {
+        document.getElementById('modalReservadoPor').textContent = "Ainda não reservado";
+        document.getElementById('modalMensagemRecado').textContent = "";
+        document.getElementById('botoes-acao-pix').classList.add('hidden');
+    }
+
+    document.getElementById('pix-modal').classList.remove('hidden');
+};
+
+window.abrirReserva = function(id, nome) {
+    const item = giftsData.find(g => g.id === id);
+    if(item && item.reservadoPor) return alert("⚠️ Já reservado!");
+    document.getElementById('reserva-id').value = id;
+    document.getElementById('reserva-nome-item').textContent = nome;
+    document.getElementById('reserva-nome').value = usuarioAtualNome;
+    document.getElementById('reserva-modal').classList.remove('hidden');
+};
+
+window.confirmarReserva = function(e) {
+    e.preventDefault();
+    const id = document.getElementById('reserva-id').value;
+    const nome = document.getElementById('reserva-nome').value.trim();
+    const msg = document.getElementById('reserva-mensagem').value.trim();
+
+    db.ref(`gifts/${id}`).update({
+        reservadoPor: nome,
+        mensagem: msg,
+        status: 'reservado'
+    })
+    .then(() => {
+        alert("✅ Reserva confirmada!");
+        closeModal('reserva-modal');
+        openPixModal(id);
+    })
+    .catch(err => alert("❌ Erro: " + err.message));
+};
+
+window.confirmarCompra = function() {
+    if(!confirm("Confirmar compra?")) return;
+    db.ref(`gifts/${itemAtualId}`).update({ status: 'pago' })
+    .then(() => {
+        alert("✅ Compra confirmada!");
+        closeModal('pix-modal');
+    });
+};
+
+window.cancelarReserva = function() {
+    if(!confirm("Cancelar reserva?")) return;
+    db.ref(`gifts/${itemAtualId}`).update({
+        reservadoPor: null,
+        mensagem: null,
+        status: null
+    })
+    .then(() => {
+        alert("✅ Reserva cancelada!");
+        closeModal('pix-modal');
+    });
+};
+
+window.reativarItem = function(id) {
+    if(!isAdmin) return;
+    if(!confirm("Reativar item?")) return;
+    db.ref(`gifts/${id}`).update({ reservadoPor: null, mensagem: null, status: null });
+};
+
+window.abrirListaCompras = function() {
+    if(!isAdmin) return;
+    const comprados = giftsData.filter(g => g.reservadoPor);
+    const html = comprados.length === 0 
+        ? "<p class='text-center text-gray-500'>Nenhum item comprado</p>"
+        : comprados.map(i => `
+            <div class="p-3 border rounded bg-white">
+                <p class="font-bold">${i.name} - ${i.price}</p>
+                <p class="text-sm">Comprador: ${i.reservadoPor}</p>
+                <p class="text-sm italic">Recado: ${i.mensagem || '---'}</p>
+            </div>`).join('');
+    document.getElementById('lista-compras-conteudo').innerHTML = html;
+    document.getElementById('lista-compras-modal').classList.remove('hidden');
+};
+
+window.abrirLogs = function() {
+    if(!isAdmin) return;
+    db.ref('logs').orderByKey().limitToLast(20).once('value').then(snap => {
+        const logs = [];
+        snap.forEach(c => logs.unshift({id:c.key,...c.val()}));
+        const html = logs.length === 0 
+            ? "<p class='text-center text-gray-500'>Nenhum registro</p>"
+            : logs.map(l => `<div class="p-1 border-b text-xs"><span class="text-gray-500">[${l.data} ${l.hora}]</span> <strong>${l.tipo}</strong>: ${l.descricao}</div>`).join('');
+        document.getElementById('logs-conteudo').innerHTML = html;
+        document.getElementById('logs-modal').classList.remove('hidden');
+    });
+};
+
+window.openSettingsModal = function() {
+    if(!isAdmin) return;
+    document.getElementById('cfg-login-title').value = siteConfig.loginTitle || "";
+    document.getElementById('cfg-login-subtitle').value = siteConfig.loginSubtitle || "";
+    document.getElementById('cfg-main-title').value = siteConfig.mainTitle || "";
+    document.getElementById('cfg-welcome-text').value = siteConfig.welcomeText || "";
+    document.getElementById('cfg-bg-image').value = siteConfig.backgroundImage || "";
+    document.getElementById('cfg-footer-text').value = siteConfig.footerText || "";
+    document.getElementById('settings-modal').classList.remove('hidden');
+};
+
+window.abrirAdicionarAdmin = function() {
+    if(!isAdmin || auth.currentUser.uid !== MEU_UID) return alert("❌ Apenas você pode cadastrar!");
+    document.getElementById('admin-modal').classList.remove('hidden');
+};
+
+window.cadastrarNovoAdmin = function(e) {
+    e.preventDefault();
+    const email = document.getElementById('novo-admin-email').value.trim();
+    const senha = document.getElementById('novo-admin-senha').value;
+
+    auth.createUserWithEmailAndPassword(email, senha)
+    .then(usuario => {
+        return db.ref(`admins/${usuario.user.uid}`).set(true);
+    })
+    .then(() => {
+        alert("✅ Novo admin cadastrado!");
+        closeModal('admin-modal');
+        document.getElementById('novo-admin-email').value = "";
+        document.getElementById('novo-admin-senha').value = "";
+    })
+    .catch(err => alert("❌ Erro: " + err.message));
+};
+
+window.saveItem = function(e) {
+    e.preventDefault();
+    if(!isAdmin) return;
+    const dados = {
+        name: document.getElementById('edit-name').value.trim(),
+        price: document.getElementById('edit-price').value.trim(),
+        icon: document.getElementById('edit-icon').value.trim(),
+        imagem: document.getElementById('edit-imagem').value.trim(),
+        pixKey: document.getElementById('edit-pixkey').value.trim()
+    };
+
+    const id = document.getElementById('edit-id').value;
+    const ref = id ? db.ref(`gifts/${id}`) : db.ref('gifts').push();
+    ref.set(dados).then(() => closeModal('edit-modal'));
+};
+
+window.deleteItem = function() {
+    if(!isAdmin || !confirm("Excluir?")) return;
+    db.ref(`gifts/${document.getElementById('edit-id').value}`).remove().then(() => closeModal('edit-modal'));
+};
+
+window.saveSettings = function(e) {
+    e.preventDefault();
+    if(!isAdmin) return;
+    const dados = {
+        loginTitle: document.getElementById('cfg-login-title').value,
+        loginSubtitle: document.getElementById('cfg-login-subtitle').value,
+        mainTitle: document.getElementById('cfg-main-title').value,
+        welcomeText: document.getElementById('cfg-welcome-text').value,
+        backgroundImage: document.getElementById('cfg-bg-image').value,
+        footerText: document.getElementById('cfg-footer-text').value
+    };
+    db.ref('configuracoes').update(dados).then(() => closeModal('settings-modal'));
+};
+
+// INICIALIZAÇÃO
+document.addEventListener("DOMContentLoaded", () => {
+    // Carrega configurações
+    db.ref('configuracoes').on('value', snap => {
+        siteConfig = snap.val() || {};
+        document.getElementById('login-title').textContent = siteConfig.loginTitle || "Lista de Presentes";
+        document.getElementById('login-subtitle').textContent = siteConfig.loginSubtitle || "Identifique-se";
+        document.getElementById('main-title').textContent = siteConfig.mainTitle || "Presentes";
+        footerText.textContent = siteConfig.footerText || "© 2026";
+        if(siteConfig.backgroundImage) paginaPrincipal.style.backgroundImage = `url(${siteConfig.backgroundImage})`;
+        if(usuarioAtualNome) atualizarSaudacao();
+    });
+
+    // Carrega itens
+    db.ref('gifts').on('value', snap => {
+        giftsData = [];
+        snap.forEach(c => giftsData.push({id:c.key, ...c.val()}));
+        renderGifts();
+    });
+});
+
+function atualizarSaudacao() {
+    welcomeText.innerHTML = (siteConfig.welcomeText || "Olá, [NOME]! Escolha um item.")
+        .replace("[NOME]", `<span class="font-bold text-pink-600">${usuarioAtualNome}</span>`);
+}
+
+function mostrarBotoesAdmin() {
+    btnNewItem.classList.remove('hidden');
+    btnSettings.classList.remove('hidden');
+    btnListaCompras.classList.remove('hidden');
+    btnLogs.classList.remove('hidden');
+    btnAdicionarAdmin.classList.remove('hidden');
+}
+
+function renderGifts() {
+    if(!giftsGrid) return;
+    giftsGrid.innerHTML = giftsData.length === 0 
+        ? "<p class='text-center col-span-full p-8 bg-white/80 rounded-xl'>Nenhum item cadastrado</p>"
+        : giftsData.map(item => `
+        <div class="card-item bg-white rounded-xl shadow p-6 relative ${item.reservadoPor ? 'reservado' : ''}">
+            ${isAdmin ? `<button onclick="openEditModal('${item.id}')" class="absolute top-2 right-10 text-gray-600 hover:text-pink-500">✏️</button>` : ''}
+            <div class="text-4xl mb-4">
+                <img src="${item.icon || 'https://cdn-icons-png.flaticon.com/512/3099/3099358.png'}" class="w-12 h-12">
             </div>
-
-            <form onsubmit="handleLogin(event)" class="space-y-5">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Seu nome</label>
-                    <input type="text" id="username" required class="w-full px-4 py-3 border border-gray-300 rounded-lg" placeholder="Digite seu nome">
-                </div>
-                <button type="submit" class="w-full bg-primary hover:bg-dark text-white py-3 rounded-lg">Acessar Lista</button>
-                <div class="text-center">
-                    <button type="button" onclick="showAdminLogin()" class="text-sm text-gray-500 hover:text-primary">Acesso Administrador</button>
-                </div>
-            </form>
-        </div>
-    </section>
-
-    <!-- Tela Admin Login -->
-    <section id="screen-admin-login" class="hidden fixed inset-0 z-40 flex items-center justify-center p-4 bg-gradient-to-br from-pink-100 to-purple-200">
-        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
-            <h2 class="text-2xl font-bold text-center mb-6">Área Administrativa</h2>
-            <form onsubmit="handleAdminLogin(event)" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
-                    <input type="email" id="admin-email" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
-                    <input type="password" id="admin-password" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
-                </div>
-                <button type="submit" class="w-full bg-primary hover:bg-dark text-white py-3 rounded-lg">Entrar</button>
-                <button type="button" onclick="loginComGoogle()" class="w-full bg-white border border-gray-300 py-3 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2">
-                    <i class="fa fa-google"></i> Entrar com Google
-                </button>
-                <div class="text-center">
-                    <button type="button" onclick="hideAdminLogin()" class="text-sm text-gray-500 hover:text-primary">Voltar</button>
-                </div>
-            </form>
-        </div>
-    </section>
-
-    <!-- Tela Principal -->
-    <main id="screen-dashboard" class="hidden container mx-auto px-4 py-6 max-w-7xl">
-        <header class="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
-            <div>
-                <h2 id="main-title" class="text-2xl font-bold text-gray-800">Presentes</h2>
-                <p id="welcomeText" class="text-gray-600 mt-1">Olá! Escolha um item para presentear.</p>
-            </div>
-            <div class="flex flex-wrap gap-2">
-                <button id="btn-new-item" onclick="openNewItemModal()" class="hidden bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
-                    <i class="fa fa-plus"></i> Novo Item
-                </button>
-                <button id="btn-settings" onclick="openSettingsModal()" class="hidden bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
-                    <i class="fa fa-cog"></i> Configurações
-                </button>
-                <button id="btn-lista-compras" onclick="abrirListaCompras()" class="hidden bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
-                    <i class="fa fa-list-check"></i> Comprados
-                </button>
-                <button id="btn-logs" onclick="abrirLogs()" class="hidden bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
-                    <i class="fa fa-history"></i> Logs
-                </button>
-                <button onclick="handleLogout()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg flex items-center gap-2">
-                    <i class="fa fa-sign-out"></i> Sair
-                </button>
-            </div>
-        </header>
-
-        <div id="pagina-principal" class="relative rounded-2xl shadow-xl p-6 mb-8 min-h-[60vh] bg-cover bg-center bg-white/80" style="background-image: url('');">
-            <div class="absolute inset-0 bg-white/60 rounded-2xl -z-10"></div>
-            <div id="gifts-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 relative z-10"></div>
-        </div>
-
-        <footer class="text-center text-gray-600 text-sm">
-            <p id="footer-text">© 2026 Lista de Presentes</p>
-        </footer>
-    </main>
-
-    <!-- MODAIS -->
-    <!-- Editar/Adicionar -->
-    <div id="edit-modal" class="hidden modal-overlay">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
-            <div class="flex justify-between items-center mb-5">
-                <h3 id="edit-modal-title" class="text-xl font-bold">Editar Item</h3>
-                <button onclick="closeModal('edit-modal')" class="text-gray-500 text-xl">&times;</button>
-            </div>
-            <form onsubmit="saveItem(event)" class="space-y-4">
-                <input type="hidden" id="edit-id">
-                <div>
-                    <label class="block text-sm font-medium mb-1">Nome</label>
-                    <input type="text" id="edit-name" required class="w-full px-3 py-2 border rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Valor</label>
-                    <input type="text" id="edit-price" required class="w-full px-3 py-2 border rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Link Ícone</label>
-                    <input type="url" id="edit-icon" class="w-full px-3 py-2 border rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Link Imagem</label>
-                    <input type="url" id="edit-imagem" class="w-full px-3 py-2 border rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Chave PIX</label>
-                    <input type="text" id="edit-pixkey" required class="w-full px-3 py-2 border rounded-lg">
-                </div>
-                <div class="flex gap-2">
-                    <button type="submit" class="flex-1 bg-primary text-white py-2 rounded-lg">Salvar</button>
-                    <button type="button" id="btn-delete" onclick="deleteItem()" class="hidden bg-red-500 text-white py-2 px-4 rounded-lg">Excluir</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal PIX -->
-    <div id="pix-modal" class="hidden modal-overlay">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md text-center">
-            <div class="flex justify-between items-center mb-4">
-                <h3 id="modal-gift-name" class="text-xl font-bold"></h3>
-                <button onclick="closeModal('pix-modal')" class="text-gray-500 text-xl">&times;</button>
-            </div>
-            <p class="mb-4">Valor: <span id="modal-gift-value" class="font-bold text-primary text-lg"></span></p>
-            <img id="modal-qr-code" src="" alt="QR Code" class="w-48 h-48 mx-auto mb-4">
-            <div class="p-2 bg-gray-50 rounded mb-4">
-                <p class="text-xs text-gray-500 mb-1">Chave PIX:</p>
-                <div class="flex items-center justify-center gap-2">
-                    <span id="pix-copia-cola" class="font-mono text-sm"></span>
-                    <button onclick="copyPixKey()" class="text-blue-600">📋</button>
-                </div>
-            </div>
-            <div class="text-left space-y-2 bg-pink-50 p-3 rounded mb-4">
-                <p class="text-sm"><strong>Reservado por:</strong> <span id="modal-reservado-por"></span></p>
-                <p class="text-sm"><strong>Recado:</strong> <span id="modal-mensagem-recado" class="italic"></span></p>
-            </div>
-            <div id="botoes-acao-pix" class="hidden flex flex-col gap-2">
-                <button onclick="confirmarCompra()" class="bg-green-600 text-white py-2 rounded">✅ Confirmar Compra</button>
-                <button onclick="cancelarReserva()" class="bg-orange-500 text-white py-2 rounded">❌ Cancelar Reserva</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Reserva -->
-    <div id="reserva-modal" class="hidden modal-overlay">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
-            <div class="flex justify-between items-center mb-5">
-                <h3 class="text-xl font-bold">Reservar Item</h3>
-                <button onclick="closeModal('reserva-modal')" class="text-gray-500 text-xl">&times;</button>
-            </div>
-            <p class="mb-4">Item: <strong id="reserva-nome-item"></strong></p>
-            <form onsubmit="confirmarReserva(event)" class="space-y-4">
-                <input type="hidden" id="reserva-id">
-                <div>
-                    <label class="block text-sm font-medium mb-1">Seu nome</label>
-                    <input type="text" id="reserva-nome" class="w-full px-3 py-2 border rounded-lg bg-gray-100" readonly>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Recado (opcional)</label>
-                    <textarea id="reserva-mensagem" rows="3" class="w-full px-3 py-2 border rounded-lg"></textarea>
-                </div>
-                <button type="submit" class="w-full bg-primary text-white py-2 rounded-lg">Confirmar Reserva</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal Configurações -->
-    <div id="settings-modal" class="hidden modal-overlay">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
-            <div class="flex justify-between items-center mb-5">
-                <h3 class="text-xl font-bold">Configurações do Sistema</h3>
-                <button onclick="closeModal('settings-modal')" class="text-gray-500 text-xl">&times;</button>
-            </div>
-            <form onsubmit="saveSettings(event)" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium mb-1">Título da Tela de Login</label>
-                    <input type="text" id="cfg-login-title" class="w-full px-3 py-2 border rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Subtítulo da Login</label>
-                    <input type="text" id="cfg-login-subtitle" class="w-full px-3 py-2 border rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Título Principal</label>
-                    <input type="text" id="cfg-main-title" class="w-full px-3 py-2 border rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Texto de Boas-vindas</label>
-                    <textarea id="cfg-welcome-text" rows="2" class="w-full px-3 py-2 border rounded-lg"></textarea>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Imagem de Fundo (URL)</label>
-                    <input type="url" id="cfg-bg-image" class="w-full px-3 py-2 border rounded-lg">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Texto do Rodapé</label>
-                    <input type="text" id="cfg-footer-text" class="w-full px-3 py-2 border rounded-lg">
-                </div>
-                <button type="submit" class="w-full bg-primary text-white py-2 rounded-lg">Salvar Configurações</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal Lista Compras -->
-    <div id="lista-compras-modal" class="hidden modal-overlay">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-2xl">
-            <div class="flex justify-between items-center mb-5">
-                <h3 class="text-xl font-bold">📋 Lista de Itens Comprados</h3>
-                <button onclick="closeModal('lista-compras-modal')" class="text-gray-500 text-xl">&times;</button>
-            </div>
-            <div id="lista-compras-conteudo" class="space-y-3"></div>
-        </div>
-    </div>
-
-    <!-- Modal Logs -->
-    <div id="logs-modal" class="hidden modal-overlay">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-2xl">
-            <div class="flex justify-between items-center mb-5">
-                <h3 class="text-xl font-bold">📜 Histórico de Alterações</h3>
-                <button onclick="closeModal('logs-modal')" class="text-gray-500 text-xl">&times;</button>
-            </div>
-            <div id="logs-conteudo" class="space-y-2 text-sm"></div>
-        </div>
-    </div>
-
-    <script type="module" src="firebase.js"></script>
-    <script type="module" src="app.js"></script>
-</body>
-</html>
+            <h3 class="font-bold text-lg">${item.name}</h3>
+            <p class="text-pink-600 font-bold text-xl my-2">${item.price}</p>
+            <button onclick="${item.reservadoPor ? `openPixModal('${item.id}')` : `abrirReserva('${item.id}','${item.name.replace(/'/g, "\\'")}')`}" 
+                class="w-full mt-2 py-2 rounded-lg font-semibold ${item.reservadoPor ? 'bg-gray-500 text-white' : 'bg-pink-500 hover:bg-pink-600 text-white'}">
+                ${item.reservadoPor ? 'Ver PIX' : 'Escolher este'}
+            </button>
+        </div>`).join('');
+}
