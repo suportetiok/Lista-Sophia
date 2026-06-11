@@ -1,7 +1,7 @@
-import { db, auth, providerGoogle, ref, onValue, set, update, push, remove, get, signInWithEmailAndPassword, signInWithPopup, signOut, onAuthStateChanged } from './firebase.js';
+import { db, auth, providerGoogle, ref, onValue, set, update, push, remove, get, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, sendPasswordResetEmail, signOut, onAuthStateChanged } from './firebase.js';
 
-// ✅ SEU UID QUE VOCÊ ME PASSOU - NÃO MUDE AQUI
-const UID_ADMIN_CORRETO = "lWScb6ixfRQRNBkPloMdKcGFHzS2";
+// ✅ SEU UID EXATO - NÃO MUDE
+const MEU_UID = "lWScb6ixfRQRNBkPloMdKcGFHzS2";
 
 // Variáveis Globais
 let isAdmin = false;
@@ -22,8 +22,9 @@ const btnNewItem = document.getElementById('btn-new-item');
 const btnSettings = document.getElementById('btn-settings');
 const btnListaCompras = document.getElementById('btn-lista-compras');
 const btnLogs = document.getElementById('btn-logs');
+const btnAdicionarAdmin = document.getElementById('btn-adicionar-admin');
 
-// Elementos Modais
+// Modais
 const editModal = document.getElementById('edit-modal');
 const editId = document.getElementById('edit-id');
 const editName = document.getElementById('edit-name');
@@ -56,7 +57,14 @@ const cfgWelcomeText = document.getElementById('cfg-welcome-text');
 const cfgBgImage = document.getElementById('cfg-bg-image');
 const cfgFooterText = document.getElementById('cfg-footer-text');
 
-// FUNÇÕES GLOBAIS
+const adminModal = document.getElementById('admin-modal');
+const novoAdminEmail = document.getElementById('novo-admin-email');
+const novoAdminSenha = document.getElementById('novo-admin-senha');
+
+const recuperarSenhaModal = document.getElementById('recuperar-senha-modal');
+const emailRecuperacao = document.getElementById('email-recuperacao');
+
+// FUNÇÕES
 window.closeModal = function(modalId) {
     const modal = document.getElementById(modalId);
     if(modal) modal.classList.add('hidden');
@@ -66,7 +74,7 @@ window.copyPixKey = function() {
     if (!pixCopiaCola) return;
     navigator.clipboard.writeText(pixCopiaCola.textContent)
     .then(() => alert("✅ Código PIX copiado!"))
-    .catch(() => alert("❌ Erro ao copiar, copie manualmente."));
+    .catch(() => alert("❌ Erro ao copiar"));
 };
 
 window.showAdminLogin = function() {
@@ -79,6 +87,23 @@ window.hideAdminLogin = function() {
     screenLogin.classList.remove('hidden');
 };
 
+// ✅ RECUPERAR SENHA - AGORA FUNCIONANDO
+window.abrirRecuperarSenha = function() {
+    recuperarSenhaModal.classList.remove('hidden');
+};
+
+window.enviarRecuperacao = async function() {
+    const email = emailRecuperacao.value.trim();
+    if(!email) return alert("Digite o e-mail!");
+    try {
+        await sendPasswordResetEmail(auth, email);
+        alert("✅ E-mail enviado! Verifique sua caixa de entrada (e spam).");
+        closeModal('recuperar-senha-modal');
+    } catch (erro) {
+        alert("❌ Erro: " + erro.message);
+    }
+};
+
 window.handleAdminLogin = async function(event) {
     event.preventDefault();
     const email = document.getElementById('admin-email').value.trim();
@@ -87,18 +112,28 @@ window.handleAdminLogin = async function(event) {
     try {
         const resultado = await signInWithEmailAndPassword(auth, email, senha);
         
-        // 🔍 MOSTRA O UID REAL LOGADO - PARA CONFIRMAR
-        alert("🔍 SEU UID LOGADO: " + resultado.user.uid + "\n✅ UID ADMIN CADASTRADO: " + UID_ADMIN_CORRETO);
+        // 🔍 DIAGNÓSTICO COMPLETO
+        const uidLogado = resultado.user.uid;
+        alert(`🔍 DIAGNÓSTICO:\nSeu UID logado: ${uidLogado}\nUID cadastrado como admin: ${MEU_UID}\nSÃO IGUAIS? ${uidLogado === MEU_UID ? 'SIM ✅' : 'NÃO ❌'}`);
 
-        // ✅ VERIFICAÇÃO EXATA
-        if (resultado.user.uid === UID_ADMIN_CORRETO) {
+        // ✅ FORÇA ADMIN SE FOR SEU UID
+        if (uidLogado === MEU_UID) {
             isAdmin = true;
             usuarioAtualNome = "Administrador";
             mostrarBotoesAdmin();
-            alert("✅ LOGADO COMO ADMINISTRADOR!");
+            alert("✅ LOGADO COMO ADMIN!");
         } else {
-            isAdmin = false;
-            alert("❌ NÃO É ADMIN - UID DIFERENTE");
+            // Verifica no banco
+            const snapAdmin = await get(ref(db, `admins/${uidLogado}`));
+            if (snapAdmin.exists()) {
+                isAdmin = true;
+                usuarioAtualNome = "Administrador";
+                mostrarBotoesAdmin();
+                alert("✅ LOGADO COMO ADMIN (cadastrado no banco)!");
+            } else {
+                isAdmin = false;
+                alert("❌ Usuário comum");
+            }
         }
 
         screenAdminLogin.classList.add('hidden');
@@ -107,7 +142,6 @@ window.handleAdminLogin = async function(event) {
         renderGifts();
         
     } catch (erro) {
-        console.error("ERRO LOGIN:", erro);
         alert("❌ Erro: " + erro.message);
     }
 };
@@ -115,20 +149,23 @@ window.handleAdminLogin = async function(event) {
 window.loginComGoogle = async function() {
     try {
         const resultado = await signInWithPopup(auth, providerGoogle);
+        
+        // 🔍 DIAGNÓSTICO
+        const uidLogado = resultado.user.uid;
+        alert(`🔍 DIAGNÓSTICO GOOGLE:\nSeu UID logado: ${uidLogado}\nUID cadastrado: ${MEU_UID}\nSÃO IGUAIS? ${uidLogado === MEU_UID ? 'SIM ✅' : 'NÃO ❌'}`);
 
-        // 🔍 MOSTRA O UID REAL LOGADO - PARA CONFIRMAR
-        alert("🔍 SEU UID LOGADO: " + resultado.user.uid + "\n✅ UID ADMIN CADASTRADO: " + UID_ADMIN_CORRETO);
-
-        // ✅ VERIFICAÇÃO EXATA
-        if (resultado.user.uid === UID_ADMIN_CORRETO) {
+        // ✅ FORÇA ADMIN
+        if (uidLogado === MEU_UID) {
             isAdmin = true;
             usuarioAtualNome = resultado.user.displayName || "Administrador";
             mostrarBotoesAdmin();
-            alert("✅ LOGADO COM GOOGLE COMO ADMIN!");
+            alert("✅ LOGADO GOOGLE COMO ADMIN!");
         } else {
-            isAdmin = false;
+            const snapAdmin = await get(ref(db, `admins/${uidLogado}`));
+            isAdmin = snapAdmin.exists();
             usuarioAtualNome = resultado.user.displayName || "Usuário";
-            alert("✅ Acesso liberado como usuário comum");
+            alert(isAdmin ? "✅ Admin do banco" : "❌ Usuário comum");
+            if(isAdmin) mostrarBotoesAdmin();
         }
 
         screenAdminLogin.classList.add('hidden');
@@ -137,8 +174,7 @@ window.loginComGoogle = async function() {
         renderGifts();
 
     } catch (erro) {
-        console.error("ERRO GOOGLE:", erro);
-        alert("❌ Erro: " + erro.message);
+        alert("❌ Erro Google: " + erro.message);
     }
 };
 
@@ -155,6 +191,7 @@ window.handleLogin = function(event) {
         btnSettings.classList.add('hidden');
         btnListaCompras.classList.add('hidden');
         btnLogs.classList.add('hidden');
+        btnAdicionarAdmin.classList.add('hidden');
         renderGifts();
     }
 };
@@ -169,7 +206,7 @@ window.handleLogout = async function() {
 };
 
 window.openNewItemModal = function() {
-    if(!editModal || !isAdmin) { alert("❌ Acesso restrito ao administrador!"); return; }
+    if(!isAdmin) { alert("❌ Acesso restrito!"); return; }
     document.getElementById('edit-modal-title').textContent = "Adicionar Novo Presente";
     editId.value = "";
     editName.value = "";
@@ -182,7 +219,7 @@ window.openNewItemModal = function() {
 };
 
 window.openEditModal = function(giftId) {
-    if(!isAdmin) { alert("❌ Acesso restrito ao administrador!"); return; }
+    if(!isAdmin) { alert("❌ Acesso restrito!"); return; }
     const gift = giftsData.find(g => g.id === giftId);
     if(gift) {
         document.getElementById('edit-modal-title').textContent = "Editar Presente";
@@ -220,7 +257,7 @@ window.openPixModal = function(giftId) {
 window.abrirReserva = function(giftId, nomeItem) {
     const gift = giftsData.find(g => g.id === giftId);
     if(gift && gift.reservadoPor) {
-        alert("⚠️ Este presente já foi escolhido por outra pessoa!");
+        alert("⚠️ Já reservado!");
         return;
     }
     reservaId.value = giftId;
@@ -235,28 +272,20 @@ window.confirmarReserva = async function(event) {
     const nomePessoa = reservaNome.value.trim();
     const mensagemPessoa = reservaMensagem.value.trim();
     try {
-        const itemRef = ref(db, `gifts/${id}`);
-        await update(itemRef, {
-            reservadoPor: nomePessoa,
-            mensagem: mensagemPessoa,
-            status: 'reservado'
-        });
-        registrarLog("RESERVA", `Item reservado por ${nomePessoa}`);
+        await update(ref(db, `gifts/${id}`), { reservadoPor: nomePessoa, mensagem: mensagemPessoa, status: 'reservado' });
         alert("✅ Reserva confirmada!");
         closeModal('reserva-modal');
         openPixModal(id);
     } catch (erro) {
-        alert("❌ Erro ao reservar: " + erro.message);
+        alert("❌ Erro: " + erro.message);
     }
 };
 
 window.confirmarCompra = async function() {
     if(!itemAtualId) return;
-    if(!confirm("Tem certeza que deseja CONFIRMAR a compra?")) return;
+    if(!confirm("Confirmar compra?")) return;
     try {
-        const itemRef = ref(db, `gifts/${itemAtualId}`);
-        await update(itemRef, { status: 'pago' });
-        registrarLog("VENDA", `Compra confirmada ID: ${itemAtualId}`);
+        await update(ref(db, `gifts/${itemAtualId}`), { status: 'pago' });
         alert("✅ Compra confirmada!");
         closeModal('pix-modal');
     } catch (erro) {
@@ -266,15 +295,9 @@ window.confirmarCompra = async function() {
 
 window.cancelarReserva = async function() {
     if(!itemAtualId) return;
-    if(!confirm("Tem certeza que deseja CANCELAR esta reserva?")) return;
+    if(!confirm("Cancelar reserva?")) return;
     try {
-        const itemRef = ref(db, `gifts/${itemAtualId}`);
-        await update(itemRef, {
-            reservadoPor: null,
-            mensagem: null,
-            status: null
-        });
-        registrarLog("CANCELAMENTO", `Reserva cancelada`);
+        await update(ref(db, `gifts/${itemAtualId}`), { reservadoPor: null, mensagem: null, status: null });
         alert("✅ Reserva cancelada!");
         closeModal('pix-modal');
     } catch (erro) {
@@ -283,16 +306,10 @@ window.cancelarReserva = async function() {
 };
 
 window.reativarItem = async function(giftId) {
-    if(!isAdmin) { alert("❌ Acesso restrito!"); return; }
-    if(!confirm("Deseja reativar este item?")) return;
+    if(!isAdmin) return;
+    if(!confirm("Reativar item?")) return;
     try {
-        const itemRef = ref(db, `gifts/${giftId}`);
-        await update(itemRef, {
-            reservadoPor: null,
-            mensagem: null,
-            status: null
-        });
-        registrarLog("REATIVACAO", `Item reativado`);
+        await update(ref(db, `gifts/${giftId}`), { reservadoPor: null, mensagem: null, status: null });
         alert("✅ Item reativado!");
         renderGifts();
     } catch (erro) {
@@ -301,37 +318,29 @@ window.reativarItem = async function(giftId) {
 };
 
 window.abrirListaCompras = async function() {
-    if(!isAdmin) { alert("❌ Acesso restrito!"); return; }
+    if(!isAdmin) return;
     const conteudo = document.getElementById('lista-compras-conteudo');
     const comprados = giftsData.filter(g => g.reservadoPor);
-    conteudo.innerHTML = comprados.length === 0 ? "<p class='text-center text-gray-500'>Nenhum item comprado</p>" :
-        comprados.map(i => `
-        <div class="p-3 border rounded bg-white">
-            <p class="font-bold">${i.name} - ${i.price}</p>
-            <p class="text-sm">Comprador: ${i.reservadoPor}</p>
-            <p class="text-sm italic">Recado: ${i.mensagem || '---'}</p>
-            <p class="text-xs ${i.status==='pago'?'text-green-600':i.status==='reservado'?'text-orange-500':'text-blue-600'}">Status: ${i.status||'Reativado'}</p>
-        </div>`).join('');
+    conteudo.innerHTML = comprados.length === 0 ? "<p>Nenhum item</p>" : comprados.map(i => `<div class="p-2 border"><p class="font-bold">${i.name}</p><p>Comprador: ${i.reservadoPor}</p></div>`).join('');
     document.getElementById('lista-compras-modal').classList.remove('hidden');
 };
 
 window.abrirLogs = async function() {
-    if(!isAdmin) { alert("❌ Acesso restrito!"); return; }
+    if(!isAdmin) return;
     const conteudo = document.getElementById('logs-conteudo');
     try {
         const snap = await get(ref(db, 'logs'));
         const logs = [];
         snap.forEach(c => logs.unshift({id:c.key,...c.val()}));
-        conteudo.innerHTML = logs.length === 0 ? "<p class='text-center text-gray-500'>Nenhum registro</p>" :
-            logs.map(l=>`<div class="p-2 border-b"><span class="text-xs text-gray-500">[${l.data} ${l.hora}]</span> <span class="font-semibold">${l.tipo}</span> ${l.descricao} <span class="text-xs">por ${l.usuario}</span></div>`).join('');
+        conteudo.innerHTML = logs.length === 0 ? "<p>Nenhum log</p>" : logs.map(l=>`<div class="p-1 text-xs">[${l.data}] ${l.tipo}: ${l.descricao}</div>`).join('');
         document.getElementById('logs-modal').classList.remove('hidden');
     } catch (erro) {
-        conteudo.innerHTML = "<p class='text-red-500'>Erro ao carregar</p>";
+        conteudo.innerHTML = "<p>Erro</p>";
     }
 };
 
 window.openSettingsModal = function() {
-    if(!isAdmin) { alert("❌ Acesso restrito!"); return; }
+    if(!isAdmin) return;
     cfgLoginTitle.value = siteConfig.loginTitle || "";
     cfgLoginSubtitle.value = siteConfig.loginSubtitle || "";
     cfgMainTitle.value = siteConfig.mainTitle || "";
@@ -341,25 +350,32 @@ window.openSettingsModal = function() {
     settingsModal.classList.remove('hidden');
 };
 
+window.abrirAdicionarAdmin = function() {
+    if(!isAdmin || auth.currentUser.uid !== MEU_UID) { alert("Apenas o mestre pode cadastrar!"); return; }
+    adminModal.classList.remove('hidden');
+};
+
+window.cadastrarNovoAdmin = async function(e) {
+    e.preventDefault();
+    const email = novoAdminEmail.value.trim();
+    const senha = novoAdminSenha.value;
+    try {
+        const usuarioCriado = await createUserWithEmailAndPassword(auth, email, senha);
+        await set(ref(db, `admins/${usuarioCriado.user.uid}`), true);
+        alert("✅ Admin cadastrado!");
+        closeModal('admin-modal');
+    } catch (erro) {
+        alert("❌ Erro: " + erro.message);
+    }
+};
+
 window.saveItem = async function(e) {
     e.preventDefault();
     if(!isAdmin) return;
-    const item = {
-        name: editName.value.trim(),
-        price: editPrice.value.trim(),
-        icon: editIcon.value.trim(),
-        imagem: editImagem.value.trim(),
-        pixKey: editPixKey.value.trim()
-    };
+    const item = { name: editName.value.trim(), price: editPrice.value.trim(), icon: editIcon.value.trim(), imagem: editImagem.value.trim(), pixKey: editPixKey.value.trim() };
     try {
-        if(editId.value) {
-            await update(ref(db, `gifts/${editId.value}`), item);
-            registrarLog("EDIÇÃO", `Item alterado: ${item.name}`, editId.value);
-        } else {
-            const novaRef = push(ref(db, 'gifts'));
-            await set(novaRef, item);
-            registrarLog("CRIAÇÃO", `Novo item: ${item.name}`, novaRef.key);
-        }
+        if(editId.value) await update(ref(db, `gifts/${editId.value}`), item);
+        else await set(push(ref(db, 'gifts')), item);
         closeModal('edit-modal');
     } catch (erro) {
         alert("❌ Erro: " + erro.message);
@@ -367,65 +383,38 @@ window.saveItem = async function(e) {
 };
 
 window.deleteItem = async function() {
-    if(!isAdmin || !confirm("Excluir item permanentemente?")) return;
-    try {
-        const nome = giftsData.find(g=>g.id===editId.value)?.name;
-        await remove(ref(db, `gifts/${editId.value}`));
-        registrarLog("EXCLUSÃO", `Item excluído: ${nome}`, editId.value);
-        closeModal('edit-modal');
-    } catch (erro) {
-        alert("❌ Erro: " + erro.message);
-    }
+    if(!isAdmin || !confirm("Excluir?")) return;
+    try { await remove(ref(db, `gifts/${editId.value}`)); closeModal('edit-modal'); } 
+    catch (erro) { alert("❌ Erro: " + erro.message); }
 };
 
 window.saveSettings = async function(e) {
     e.preventDefault();
     if(!isAdmin) return;
-    const dados = {
-        loginTitle: cfgLoginTitle.value,
-        loginSubtitle: cfgLoginSubtitle.value,
-        mainTitle: cfgMainTitle.value,
-        welcomeText: cfgWelcomeText.value,
-        backgroundImage: cfgBgImage.value,
-        footerText: cfgFooterText.value
-    };
-    try {
-        await update(ref(db, 'configuracoes'), dados);
-        registrarLog("CONFIG", "Configurações alteradas");
-        closeModal('settings-modal');
-    } catch (erro) {
-        alert("❌ Erro: " + erro.message);
-    }
+    const dados = { loginTitle: cfgLoginTitle.value, loginSubtitle: cfgLoginSubtitle.value, mainTitle: cfgMainTitle.value, welcomeText: cfgWelcomeText.value, backgroundImage: cfgBgImage.value, footerText: cfgFooterText.value };
+    try { await update(ref(db, 'configuracoes'), dados); closeModal('settings-modal'); } 
+    catch (erro) { alert("❌ Erro: " + erro.message); }
 };
 
 document.addEventListener("DOMContentLoaded", () => {
-    // Carrega configurações
     onValue(ref(db, 'configuracoes'), snap => {
         siteConfig = snap.val() || {};
         document.getElementById('login-title').textContent = siteConfig.loginTitle || "Lista de Presentes";
-        document.getElementById('login-subtitle').textContent = siteConfig.loginSubtitle || "Identifique-se para acessar";
+        document.getElementById('login-subtitle').textContent = siteConfig.loginSubtitle || "Identifique-se";
         document.getElementById('main-title').textContent = siteConfig.mainTitle || "Presentes";
         footerText.textContent = siteConfig.footerText || "© 2026";
         if(siteConfig.backgroundImage) paginaPrincipal.style.backgroundImage = `url(${siteConfig.backgroundImage})`;
-        if(usuarioAtualNome) atualizarSaudacao();
     });
 
-    // ✅ CARREGA TODOS OS ITENS - CORRIGIDO
     onValue(ref(db, 'gifts'), snap => {
         giftsData = [];
-        snap.forEach(childSnapshot => {
-            giftsData.push({
-                id: childSnapshot.key,
-                ...childSnapshot.val()
-            });
-        });
+        snap.forEach(c => giftsData.push({id:c.key,...c.val()}));
         renderGifts();
     });
 });
 
 function atualizarSaudacao() {
-    welcomeText.innerHTML = (siteConfig.welcomeText || "Olá, [NOME]! Escolha um item para presentear.")
-        .replace("[NOME]", `<span class="font-semibold text-pink-600">${usuarioAtualNome}</span>`);
+    welcomeText.innerHTML = `Olá, <span class="font-bold text-pink-600">${usuarioAtualNome}</span>! Escolha um item.`;
 }
 
 function mostrarBotoesAdmin() {
@@ -433,34 +422,25 @@ function mostrarBotoesAdmin() {
     btnSettings.classList.remove('hidden');
     btnListaCompras.classList.remove('hidden');
     btnLogs.classList.remove('hidden');
+    btnAdicionarAdmin.classList.remove('hidden');
 }
 
 function registrarLog(tipo, descricao, itemId=null) {
-    const agora = new Date();
-    push(ref(db, 'logs'), {
-        tipo, descricao, itemId,
-        data: agora.toLocaleDateString('pt-BR'),
-        hora: agora.toLocaleTimeString('pt-BR'),
-        usuario: usuarioAtualNome
-    });
+    push(ref(db, 'logs'), { tipo, descricao, itemId, data: new Date().toLocaleDateString('pt-BR'), hora: new Date().toLocaleTimeString('pt-BR'), usuario: usuarioAtualNome });
 }
 
 function renderGifts() {
     if(!giftsGrid) return;
-    giftsGrid.innerHTML = giftsData.length === 0 ? "<p class='text-center col-span-full bg-white/80 p-4 rounded'>Nenhum item cadastrado</p>" :
+    giftsGrid.innerHTML = giftsData.length === 0 ? "<p class='text-center p-4'>Nenhum item</p>" :
         giftsData.map(item => `
-        <div class="card-item bg-white rounded-xl shadow p-6 relative ${item.reservadoPor?'reservado':''}">
-            <div class="card-overlay"></div>
-            ${isAdmin?`<button onclick="openEditModal('${item.id}')" class="absolute top-2 right-10 text-gray-700 hover:text-pink-600">✏️</button>`:''}
-            ${isAdmin && item.reservadoPor?`<button onclick="reativarItem('${item.id}')" class="absolute top-2 right-2 text-xs bg-blue-500 text-white px-2 py-1 rounded">🔄 Reativar</button>`:''}
-            <div class="text-4xl mb-4 bg-pink-50/80 p-3 rounded-xl inline-block">
-                <img src="${item.icon}" class="icon-img" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3099/3099358.png'">
-            </div>
+        <div class="bg-white rounded-xl shadow p-6 relative ${item.reservadoPor?'opacity-70':''}">
+            ${isAdmin?`<button onclick="openEditModal('${item.id}')" class="absolute top-2 right-10">✏️</button>`:''}
+            <div class="text-4xl mb-4"><img src="${item.icon}" class="w-12 h-12"></div>
             <h3 class="font-bold text-lg">${item.name}</h3>
-            <p class="text-pink-600 font-bold text-xl my-2">${item.price}</p>
-            <button onclick="${item.reservadoPor?`openPixModal('${item.id}')`:`abrirReserva('${item.id}','${item.name.replace(/'/g, "\\'")}')`}" 
-                class="w-full mt-2 py-2 rounded-lg font-semibold ${item.reservadoPor?'bg-gray-500/90 text-white':'bg-pink-500/90 hover:bg-pink-600 text-white'}">
-                ${item.reservadoPor?'Ver PIX/Recado':'Escolher este'}
+            <p class="text-pink-600 font-bold text-xl">${item.price}</p>
+            <button onclick="${item.reservadoPor?`openPixModal('${item.id}')`:`abrirReserva('${item.id}','${item.name}')`}" 
+                class="w-full mt-3 py-2 rounded-lg ${item.reservadoPor?'bg-gray-500':'bg-pink-500 hover:bg-pink-600'} text-white">
+                ${item.reservadoPor?'Ver PIX':'Escolher'}
             </button>
         </div>`).join('');
 }
