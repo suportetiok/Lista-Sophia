@@ -11,329 +11,268 @@
             theme: {
                 extend: {
                     colors: {
-                        pink: {
-                            50: '#fdf2f8',
-                            500: '#ec4899',
-                            600: '#db2777',
-                        }
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'system-ui', 'sans-serif'],
-                    },
+                        primary: '#EC4899',
+                        secondary: '#F472B6',
+                        light: '#FDF2F8',
+                        dark: '#831843'
+                    }
                 }
             }
         }
     </script>
-    <style type="text/tailwindcss">
-        @layer utilities {
-            .content-auto {
-                content-visibility: auto;
-            }
-            .card-item {
-                @apply transition-all duration-300 hover:scale-[1.02];
-            }
-            .reservado {
-                @apply opacity-60 grayscale;
-            }
-            .modal {
-                @apply fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm;
-            }
-            .modal-content {
-                @apply bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 mx-4;
-            }
+    <style>
+        .hidden { display: none !important; }
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            padding: 1rem;
+        }
+        .card-item {
+            position: relative;
+            overflow: hidden;
+        }
+        .reservado {
+            opacity: 0.7;
+            background: #f3f4f6;
         }
     </style>
 </head>
-<body class="bg-gradient-to-br from-pink-50 to-purple-50 min-h-screen font-sans">
+<body class="bg-gradient-to-br from-pink-100 to-purple-200 min-h-screen font-sans">
 
-    <!-- TELA DE LOGIN COMUM -->
-    <div id="screen-login" class="min-h-screen flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md text-center">
-            <h1 id="login-title" class="text-[clamp(1.8rem,4vw,2.5rem)] font-bold text-pink-500 mb-2">Lista de Presentes</h1>
-            <p id="login-subtitle" class="text-gray-600 mb-8">Identifique-se para acessar</p>
-
-            <div class="mb-6 text-left">
-                <label class="block text-gray-700 font-medium mb-2">Seu nome</label>
-                <input type="text" id="username" placeholder="Digite seu nome" 
-                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition">
+    <!-- Tela de Login -->
+    <section id="screen-login" class="fixed inset-0 z-40 flex items-center justify-center p-4 bg-gradient-to-br from-pink-100 to-purple-200">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+            <div class="text-center mb-8">
+                <h1 id="login-title" class="text-3xl font-bold text-primary mb-2">Lista de Presentes</h1>
+                <p id="login-subtitle" class="text-gray-600">Identifique-se para acessar</p>
             </div>
 
-            <button onclick="handleLogin(event)" 
-                class="w-full bg-pink-500 hover:bg-pink-600 text-white font-semibold py-3 px-4 rounded-lg transition mb-4">
-                Acessar Lista
-            </button>
-
-            <button onclick="showAdminLogin()" class="text-pink-500 hover:text-pink-700 font-medium text-sm">
-                Acesso Administrador
-            </button>
+            <form onsubmit="handleLogin(event)" class="space-y-5">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Seu nome</label>
+                    <input type="text" id="username" required class="w-full px-4 py-3 border border-gray-300 rounded-lg" placeholder="Digite seu nome">
+                </div>
+                <button type="submit" class="w-full bg-primary hover:bg-dark text-white py-3 rounded-lg">Acessar Lista</button>
+                <div class="text-center">
+                    <button type="button" onclick="showAdminLogin()" class="text-sm text-gray-500 hover:text-primary">Acesso Administrador</button>
+                </div>
+            </form>
         </div>
-    </div>
+    </section>
 
-    <!-- TELA DE LOGIN ADMINISTRADOR -->
-    <div id="screen-admin-login" class="hidden min-h-screen flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md text-center">
-            <h2 class="text-2xl font-bold text-pink-500 mb-6">Acesso Administrador</h2>
+    <!-- Tela Admin Login -->
+    <section id="screen-admin-login" class="hidden fixed inset-0 z-40 flex items-center justify-center p-4 bg-gradient-to-br from-pink-100 to-purple-200">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+            <h2 class="text-2xl font-bold text-center mb-6">Área Administrativa</h2>
+            <form onsubmit="handleAdminLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
+                    <input type="email" id="admin-email" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+                    <input type="password" id="admin-password" required class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                </div>
+                <button type="submit" class="w-full bg-primary hover:bg-dark text-white py-3 rounded-lg">Entrar</button>
+                <button type="button" onclick="loginComGoogle()" class="w-full bg-white border border-gray-300 py-3 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2">
+                    <i class="fa fa-google"></i> Entrar com Google
+                </button>
+                <div class="text-center">
+                    <button type="button" onclick="hideAdminLogin()" class="text-sm text-gray-500 hover:text-primary">Voltar</button>
+                </div>
+            </form>
+        </div>
+    </section>
 
-            <div class="mb-4 text-left">
-                <label class="block text-gray-700 font-medium mb-2">E-mail</label>
-                <input type="email" id="admin-email" placeholder="seu@email.com" 
-                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition">
+    <!-- Tela Principal -->
+    <main id="screen-dashboard" class="hidden container mx-auto px-4 py-6 max-w-7xl">
+        <header class="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
+            <div>
+                <h2 id="main-title" class="text-2xl font-bold text-gray-800">Presentes</h2>
+                <p id="welcomeText" class="text-gray-600 mt-1">Olá! Escolha um item para presentear.</p>
             </div>
-
-            <div class="mb-6 text-left">
-                <label class="block text-gray-700 font-medium mb-2">Senha</label>
-                <input type="password" id="admin-password" placeholder="••••••••" 
-                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent outline-none transition">
-                <button onclick="abrirRecuperarSenha()" class="text-xs text-pink-500 hover:underline mt-1 inline-block">
-                    Esqueci minha senha
+            <div class="flex flex-wrap gap-2">
+                <button id="btn-new-item" onclick="openNewItemModal()" class="hidden bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+                    <i class="fa fa-plus"></i> Novo Item
+                </button>
+                <button id="btn-settings" onclick="openSettingsModal()" class="hidden bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+                    <i class="fa fa-cog"></i> Configurações
+                </button>
+                <button id="btn-lista-compras" onclick="abrirListaCompras()" class="hidden bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+                    <i class="fa fa-list-check"></i> Comprados
+                </button>
+                <button id="btn-logs" onclick="abrirLogs()" class="hidden bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+                    <i class="fa fa-history"></i> Logs
+                </button>
+                <button onclick="handleLogout()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+                    <i class="fa fa-sign-out"></i> Sair
                 </button>
             </div>
+        </header>
 
-            <button onclick="handleAdminLogin(event)" 
-                class="w-full bg-pink-500 hover:bg-pink-600 text-white font-semibold py-3 px-4 rounded-lg transition mb-3">
-                Entrar
-            </button>
-
-            <button onclick="loginComGoogle()" 
-                class="w-full bg-white border border-gray-300 hover:bg-gray-gray-50 text-gray-700 font-semibold py-3 px-4 rounded-lg transition mb-4 flex items-center justify-center gap-2">
-                <i class="fa fa-google"></i> Entrar com Google
-            </button>
-
-            <button onclick="hideAdminLogin()" class="text-gray-600 hover:text-gray-800 text-sm">
-                Voltar
-            </button>
+        <div id="pagina-principal" class="relative rounded-2xl shadow-xl p-6 mb-8 min-h-[60vh] bg-cover bg-center bg-white/80" style="background-image: url('');">
+            <div class="absolute inset-0 bg-white/60 rounded-2xl -z-10"></div>
+            <div id="gifts-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 relative z-10"></div>
         </div>
-    </div>
 
-    <!-- TELA PRINCIPAL / DASHBOARD -->
-    <div id="screen-dashboard" class="hidden min-h-screen p-4 md:p-8" id="pagina-principal">
-        <div class="max-w-7xl mx-auto">
-            <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-                <div>
-                    <h1 id="main-title" class="text-[clamp(1.5rem,3vw,2.2rem)] font-bold text-pink-600">Nossos Presentes</h1>
-                    <p id="welcomeText" class="text-gray-600 mt-1"></p>
-                </div>
+        <footer class="text-center text-gray-600 text-sm">
+            <p id="footer-text">© 2026 Lista de Presentes</p>
+        </footer>
+    </main>
 
-                <div class="flex flex-wrap gap-2">
-                    <button id="btn-new-item" onclick="openNewItemModal()" class="hidden bg-pink-500 hover:bg-pink-600 text-white px-4 py-2 rounded-lg transition">
-                        + Novo Item
-                    </button>
-                    <button id="btn-settings" onclick="openSettingsModal()" class="hidden bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-lg transition">
-                        ⚙️ Configurações
-                    </button>
-                    <button id="btn-lista-compras" onclick="abrirListaCompras()" class="hidden bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition">
-                        📋 Comprados
-                    </button>
-                    <button id="btn-logs" onclick="abrirLogs()" class="hidden bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">
-                        📜 Logs
-                    </button>
-                    <button id="btn-adicionar-admin" onclick="abrirAdicionarAdmin()" class="hidden bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition">
-                        👑 Novo Admin
-                    </button>
-                    <button onclick="handleLogout()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition">
-                        Sair
-                    </button>
-                </div>
+    <!-- MODAIS -->
+    <!-- Editar/Adicionar -->
+    <div id="edit-modal" class="hidden modal-overlay">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
+            <div class="flex justify-between items-center mb-5">
+                <h3 id="edit-modal-title" class="text-xl font-bold">Editar Item</h3>
+                <button onclick="closeModal('edit-modal')" class="text-gray-500 text-xl">&times;</button>
             </div>
-
-            <div id="gifts-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                <!-- Itens carregados pelo JavaScript -->
-            </div>
-
-            <footer id="footer-text" class="mt-16 text-center text-gray-500 text-sm">
-                © 2026 - Todos os direitos reservados
-            </footer>
-        </div>
-    </div>
-
-    <!-- ============================================== MODAIS ============================================== -->
-
-    <!-- MODAL: Adicionar / Editar Item -->
-    <div id="edit-modal" class="hidden modal">
-        <div class="modal-content">
-            <h3 id="edit-modal-title" class="text-xl font-bold text-gray-800 mb-4">Editar Presente</h3>
-            <form onsubmit="saveItem(event)">
+            <form onsubmit="saveItem(event)" class="space-y-4">
                 <input type="hidden" id="edit-id">
-                <div class="mb-3">
-                    <label class="block text-gray-700 text-sm mb-1">Nome</label>
-                    <input type="text" id="edit-name" class="w-full px-3 py-2 border rounded-lg" required>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Nome</label>
+                    <input type="text" id="edit-name" required class="w-full px-3 py-2 border rounded-lg">
                 </div>
-                <div class="mb-3">
-                    <label class="block text-gray-700 text-sm mb-1">Preço</label>
-                    <input type="text" id="edit-price" class="w-full px-3 py-2 border rounded-lg" placeholder="R$ 0,00" required>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Valor</label>
+                    <input type="text" id="edit-price" required class="w-full px-3 py-2 border rounded-lg">
                 </div>
-                <div class="mb-3">
-                    <label class="block text-gray-700 text-sm mb-1">Ícone (URL)</label>
-                    <input type="text" id="edit-icon" class="w-full px-3 py-2 border rounded-lg">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Link Ícone</label>
+                    <input type="url" id="edit-icon" class="w-full px-3 py-2 border rounded-lg">
                 </div>
-                <div class="mb-3">
-                    <label class="block text-gray-700 text-sm mb-1">Imagem (URL)</label>
-                    <input type="text" id="edit-imagem" class="w-full px-3 py-2 border rounded-lg">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Link Imagem</label>
+                    <input type="url" id="edit-imagem" class="w-full px-3 py-2 border rounded-lg">
                 </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm mb-1">Chave PIX</label>
-                    <input type="text" id="edit-pixkey" class="w-full px-3 py-2 border rounded-lg" required>
-                </div>
-                <div class="flex justify-between gap-2">
-                    <button type="button" onclick="closeModal('edit-modal')" class="flex-1 bg-gray-200 hover:bg-gray-300 py-2 rounded-lg">Cancelar</button>
-                    <button type="submit" class="flex-1 bg-pink-500 hover:bg-pink-600 text-white py-2 rounded-lg">Salvar</button>
-                    <button type="button" id="btn-delete" onclick="deleteItem()" class="hidden bg-red-500 hover:bg-red-600 text-white py-2 px-3 rounded-lg">Excluir</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL: PIX e Detalhes -->
-    <div id="pix-modal" class="hidden modal">
-        <div class="modal-content text-center">
-            <h3 id="modal-gift-name" class="text-xl font-bold mb-2"></h3>
-            <p id="modal-gift-value" class="text-pink-600 font-bold text-lg mb-4"></p>
-            
-            <img id="modal-qr-code" src="" class="w-48 h-48 mx-auto mb-4 rounded-lg border">
-            
-            <div class="bg-gray-100 p-3 rounded-lg mb-4">
-                <p class="text-sm text-gray-600 mb-1">Código PIX:</p>
-                <p id="pix-copia-cola" class="font-mono text-sm break-all"></p>
-                <button onclick="copyPixKey()" class="mt-2 text-pink-500 text-sm hover:underline">Copiar</button>
-            </div>
-
-            <div class="text-left mb-4">
-                <p class="text-sm font-semibold">Reservado por: <span id="modalReservadoPor" class="font-normal"></span></p>
-                <p class="text-sm mt-1">Recado: <span id="modalMensagemRecado" class="font-normal italic"></span></p>
-            </div>
-
-            <div id="botoes-acao-pix" class="flex gap-2 mb-4">
-                <button onclick="confirmarCompra()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Confirmar Compra</button>
-                <button onclick="cancelarReserva()" class="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg">Cancelar Reserva</button>
-            </div>
-
-            <button onclick="closeModal('pix-modal')" class="w-full bg-gray-200 hover:bg-gray-300 py-2 rounded-lg">Fechar</button>
-        </div>
-    </div>
-
-    <!-- MODAL: Reservar Item -->
-    <div id="reserva-modal" class="hidden modal">
-        <div class="modal-content">
-            <h3 class="text-lg font-bold mb-3">Reservar: <span id="reserva-nome-item"></span></h3>
-            <form onsubmit="confirmarReserva(event)">
-                <input type="hidden" id="reserva-id">
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Seu nome</label>
-                    <input type="text" id="reserva-nome" class="w-full px-3 py-2 border rounded-lg" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-sm mb-1">Recado (opcional)</label>
-                    <textarea id="reserva-mensagem" class="w-full px-3 py-2 border rounded-lg" rows="3" placeholder="Deixe uma mensagem..."></textarea>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Chave PIX</label>
+                    <input type="text" id="edit-pixkey" required class="w-full px-3 py-2 border rounded-lg">
                 </div>
                 <div class="flex gap-2">
-                    <button type="button" onclick="closeModal('reserva-modal')" class="flex-1 bg-gray-200 hover:bg-gray-300 py-2 rounded-lg">Cancelar</button>
-                    <button type="submit" class="flex-1 bg-pink-500 hover:bg-pink-600 text-white py-2 rounded-lg">Confirmar Reserva</button>
+                    <button type="submit" class="flex-1 bg-primary text-white py-2 rounded-lg">Salvar</button>
+                    <button type="button" id="btn-delete" onclick="deleteItem()" class="hidden bg-red-500 text-white py-2 px-4 rounded-lg">Excluir</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- MODAL: Configurações do Sistema -->
-    <div id="settings-modal" class="hidden modal">
-        <div class="modal-content">
-            <h3 class="text-xl font-bold mb-4">Configurações do Sistema</h3>
-            <form onsubmit="saveSettings(event)">
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Título da tela de login</label>
+    <!-- Modal PIX -->
+    <div id="pix-modal" class="hidden modal-overlay">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md text-center">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="modal-gift-name" class="text-xl font-bold"></h3>
+                <button onclick="closeModal('pix-modal')" class="text-gray-500 text-xl">&times;</button>
+            </div>
+            <p class="mb-4">Valor: <span id="modal-gift-value" class="font-bold text-primary text-lg"></span></p>
+            <img id="modal-qr-code" src="" alt="QR Code" class="w-48 h-48 mx-auto mb-4">
+            <div class="p-2 bg-gray-50 rounded mb-4">
+                <p class="text-xs text-gray-500 mb-1">Chave PIX:</p>
+                <div class="flex items-center justify-center gap-2">
+                    <span id="pix-copia-cola" class="font-mono text-sm"></span>
+                    <button onclick="copyPixKey()" class="text-blue-600">📋</button>
+                </div>
+            </div>
+            <div class="text-left space-y-2 bg-pink-50 p-3 rounded mb-4">
+                <p class="text-sm"><strong>Reservado por:</strong> <span id="modal-reservado-por"></span></p>
+                <p class="text-sm"><strong>Recado:</strong> <span id="modal-mensagem-recado" class="italic"></span></p>
+            </div>
+            <div id="botoes-acao-pix" class="hidden flex flex-col gap-2">
+                <button onclick="confirmarCompra()" class="bg-green-600 text-white py-2 rounded">✅ Confirmar Compra</button>
+                <button onclick="cancelarReserva()" class="bg-orange-500 text-white py-2 rounded">❌ Cancelar Reserva</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Reserva -->
+    <div id="reserva-modal" class="hidden modal-overlay">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
+            <div class="flex justify-between items-center mb-5">
+                <h3 class="text-xl font-bold">Reservar Item</h3>
+                <button onclick="closeModal('reserva-modal')" class="text-gray-500 text-xl">&times;</button>
+            </div>
+            <p class="mb-4">Item: <strong id="reserva-nome-item"></strong></p>
+            <form onsubmit="confirmarReserva(event)" class="space-y-4">
+                <input type="hidden" id="reserva-id">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Seu nome</label>
+                    <input type="text" id="reserva-nome" class="w-full px-3 py-2 border rounded-lg bg-gray-100" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Recado (opcional)</label>
+                    <textarea id="reserva-mensagem" rows="3" class="w-full px-3 py-2 border rounded-lg"></textarea>
+                </div>
+                <button type="submit" class="w-full bg-primary text-white py-2 rounded-lg">Confirmar Reserva</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Configurações -->
+    <div id="settings-modal" class="hidden modal-overlay">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
+            <div class="flex justify-between items-center mb-5">
+                <h3 class="text-xl font-bold">Configurações do Sistema</h3>
+                <button onclick="closeModal('settings-modal')" class="text-gray-500 text-xl">&times;</button>
+            </div>
+            <form onsubmit="saveSettings(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Título da Tela de Login</label>
                     <input type="text" id="cfg-login-title" class="w-full px-3 py-2 border rounded-lg">
                 </div>
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Subtítulo da tela de login</label>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Subtítulo da Login</label>
                     <input type="text" id="cfg-login-subtitle" class="w-full px-3 py-2 border rounded-lg">
                 </div>
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Título principal</label>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Título Principal</label>
                     <input type="text" id="cfg-main-title" class="w-full px-3 py-2 border rounded-lg">
                 </div>
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Texto de boas-vindas</label>
-                    <input type="text" id="cfg-welcome-text" class="w-full px-3 py-2 border rounded-lg" placeholder="Olá, [NOME]!">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Texto de Boas-vindas</label>
+                    <textarea id="cfg-welcome-text" rows="2" class="w-full px-3 py-2 border rounded-lg"></textarea>
                 </div>
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">Imagem de fundo (URL)</label>
-                    <input type="text" id="cfg-bg-image" class="w-full px-3 py-2 border rounded-lg">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Imagem de Fundo (URL)</label>
+                    <input type="url" id="cfg-bg-image" class="w-full px-3 py-2 border rounded-lg">
                 </div>
-                <div class="mb-4">
-                    <label class="block text-sm mb-1">Texto do rodapé</label>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Texto do Rodapé</label>
                     <input type="text" id="cfg-footer-text" class="w-full px-3 py-2 border rounded-lg">
                 </div>
-                <div class="flex gap-2">
-                    <button type="button" onclick="closeModal('settings-modal')" class="flex-1 bg-gray-200 hover:bg-gray-300 py-2 rounded-lg">Cancelar</button>
-                    <button type="submit" class="flex-1 bg-pink-500 hover:bg-pink-600 text-white py-2 rounded-lg">Salvar</button>
-                </div>
+                <button type="submit" class="w-full bg-primary text-white py-2 rounded-lg">Salvar Configurações</button>
             </form>
         </div>
     </div>
 
-    <!-- MODAL: Cadastrar Novo Admin -->
-    <div id="admin-modal" class="hidden modal">
-        <div class="modal-content">
-            <h3 class="text-xl font-bold mb-4">Cadastrar Novo Administrador</h3>
-            <form onsubmit="cadastrarNovoAdmin(event)">
-                <div class="mb-3">
-                    <label class="block text-sm mb-1">E-mail</label>
-                    <input type="email" id="novo-admin-email" class="w-full px-3 py-2 border rounded-lg" required>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-sm mb-1">Senha</label>
-                    <input type="password" id="novo-admin-senha" class="w-full px-3 py-2 border rounded-lg" required minlength="6">
-                </div>
-                <div class="flex gap-2">
-                    <button type="button" onclick="closeModal('admin-modal')" class="flex-1 bg-gray-200 hover:bg-gray-300 py-2 rounded-lg">Cancelar</button>
-                    <button type="submit" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg">Cadastrar</button>
-                </div>
-            </form>
+    <!-- Modal Lista Compras -->
+    <div id="lista-compras-modal" class="hidden modal-overlay">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-2xl">
+            <div class="flex justify-between items-center mb-5">
+                <h3 class="text-xl font-bold">📋 Lista de Itens Comprados</h3>
+                <button onclick="closeModal('lista-compras-modal')" class="text-gray-500 text-xl">&times;</button>
+            </div>
+            <div id="lista-compras-conteudo" class="space-y-3"></div>
         </div>
     </div>
 
-    <!-- MODAL: Recuperar Senha -->
-    <div id="recuperar-senha-modal" class="hidden modal">
-        <div class="modal-content">
-            <h3 class="text-xl font-bold mb-4">Recuperar Senha</h3>
-            <div class="mb-4">
-                <label class="block text-sm mb-1">Seu e-mail de cadastro</label>
-                <input type="email" id="email-recuperacao" class="w-full px-3 py-2 border rounded-lg" required>
+    <!-- Modal Logs -->
+    <div id="logs-modal" class="hidden modal-overlay">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-2xl">
+            <div class="flex justify-between items-center mb-5">
+                <h3 class="text-xl font-bold">📜 Histórico de Alterações</h3>
+                <button onclick="closeModal('logs-modal')" class="text-gray-500 text-xl">&times;</button>
             </div>
-            <div class="flex gap-2">
-                <button onclick="closeModal('recuperar-senha-modal')" class="flex-1 bg-gray-200 hover:bg-gray-300 py-2 rounded-lg">Cancelar</button>
-                <button onclick="enviarRecuperacao()" class="flex-1 bg-pink-500 hover:bg-pink-600 text-white py-2 rounded-lg">Enviar Link</button>
-            </div>
+            <div id="logs-conteudo" class="space-y-2 text-sm"></div>
         </div>
     </div>
 
-    <!-- MODAL: Lista de Comprados/Reservados -->
-    <div id="lista-compras-modal" class="hidden modal">
-        <div class="modal-content max-w-2xl">
-            <h3 class="text-xl font-bold mb-4">Itens Comprados/Reservados</h3>
-            <div id="lista-compras-conteudo" class="max-h-[60vh] overflow-y-auto mb-4 space-y-2">
-                <!-- Conteúdo gerado pelo JS -->
-            </div>
-            <button onclick="closeModal('lista-compras-modal')" class="w-full bg-gray-200 hover:bg-gray-300 py-2 rounded-lg">Fechar</button>
-        </div>
-    </div>
-
-    <!-- MODAL: Logs do Sistema -->
-    <div id="logs-modal" class="hidden modal">
-        <div class="modal-content max-w-2xl">
-            <h3 class="text-xl font-bold mb-4">Registro de Ações</h3>
-            <div id="logs-conteudo" class="max-h-[60vh] overflow-y-auto mb-4 space-y-1 text-sm">
-                <!-- Conteúdo gerado pelo JS -->
-            </div>
-            <button onclick="closeModal('logs-modal')" class="w-full bg-gray-200 hover:bg-gray-300 py-2 rounded-lg">Fechar</button>
-        </div>
-    </div>
-
-    <!-- ============================================== FIREBASE ============================================== -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js"></script>
-
-    <!-- SEU CÓDIGO PRINCIPAL -->
-    <script src="app.js"></script>
+    <script type="module" src="firebase.js"></script>
+    <script type="module" src="app.js"></script>
 </body>
 </html>
