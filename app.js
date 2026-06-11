@@ -1,7 +1,7 @@
 import { db, auth, providerGoogle, ref, onValue, set, update, push, remove, get, signInWithEmailAndPassword, signInWithPopup, signOut, onAuthStateChanged } from './firebase.js';
 
 // ✅ SEU UID QUE VOCÊ ME PASSOU - NÃO MUDE AQUI
-const UID_ADMIN_CORRETO = "RzQmqJQB8NP1ZCBFf77J3YScVnF2";
+const UID_ADMIN_CORRETO = "lWScb6ixfRQRNBkPloMdKcGFHzS2";
 
 // Variáveis Globais
 let isAdmin = false;
