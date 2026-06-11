@@ -110,7 +110,7 @@
         <div class="max-w-7xl mx-auto">
             <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
                 <div>
-                    <h1 id="main-title" class="text-[clamp(1.5rem,3vw,2.2rem)] font-bold text-pink-600">Presentes</h1>
+                    <h1 id="main-title" class="text-[clamp(1.5rem,3vw,2.2rem)] font-bold text-pink-600">Nossos Presentes</h1>
                     <p id="welcomeText" class="text-gray-600 mt-1"></p>
                 </div>
 
@@ -141,12 +141,14 @@
             </div>
 
             <footer id="footer-text" class="mt-16 text-center text-gray-500 text-sm">
-                © 2026 Lista de Presentes
+                © 2026 - Todos os direitos reservados
             </footer>
         </div>
     </div>
 
-    <!-- MODAIS -->
+    <!-- ============================================== MODAIS ============================================== -->
+
+    <!-- MODAL: Adicionar / Editar Item -->
     <div id="edit-modal" class="hidden modal">
         <div class="modal-content">
             <h3 id="edit-modal-title" class="text-xl font-bold text-gray-800 mb-4">Editar Presente</h3>
@@ -181,28 +183,35 @@
         </div>
     </div>
 
+    <!-- MODAL: PIX e Detalhes -->
     <div id="pix-modal" class="hidden modal">
         <div class="modal-content text-center">
             <h3 id="modal-gift-name" class="text-xl font-bold mb-2"></h3>
             <p id="modal-gift-value" class="text-pink-600 font-bold text-lg mb-4"></p>
+            
             <img id="modal-qr-code" src="" class="w-48 h-48 mx-auto mb-4 rounded-lg border">
+            
             <div class="bg-gray-100 p-3 rounded-lg mb-4">
                 <p class="text-sm text-gray-600 mb-1">Código PIX:</p>
                 <p id="pix-copia-cola" class="font-mono text-sm break-all"></p>
                 <button onclick="copyPixKey()" class="mt-2 text-pink-500 text-sm hover:underline">Copiar</button>
             </div>
+
             <div class="text-left mb-4">
                 <p class="text-sm font-semibold">Reservado por: <span id="modalReservadoPor" class="font-normal"></span></p>
                 <p class="text-sm mt-1">Recado: <span id="modalMensagemRecado" class="font-normal italic"></span></p>
             </div>
+
             <div id="botoes-acao-pix" class="flex gap-2 mb-4">
                 <button onclick="confirmarCompra()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg">Confirmar Compra</button>
                 <button onclick="cancelarReserva()" class="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg">Cancelar Reserva</button>
             </div>
+
             <button onclick="closeModal('pix-modal')" class="w-full bg-gray-200 hover:bg-gray-300 py-2 rounded-lg">Fechar</button>
         </div>
     </div>
 
+    <!-- MODAL: Reservar Item -->
     <div id="reserva-modal" class="hidden modal">
         <div class="modal-content">
             <h3 class="text-lg font-bold mb-3">Reservar: <span id="reserva-nome-item"></span></h3>
@@ -224,6 +233,7 @@
         </div>
     </div>
 
+    <!-- MODAL: Configurações do Sistema -->
     <div id="settings-modal" class="hidden modal">
         <div class="modal-content">
             <h3 class="text-xl font-bold mb-4">Configurações do Sistema</h3>
@@ -260,6 +270,7 @@
         </div>
     </div>
 
+    <!-- MODAL: Cadastrar Novo Admin -->
     <div id="admin-modal" class="hidden modal">
         <div class="modal-content">
             <h3 class="text-xl font-bold mb-4">Cadastrar Novo Administrador</h3>
@@ -280,6 +291,7 @@
         </div>
     </div>
 
+    <!-- MODAL: Recuperar Senha -->
     <div id="recuperar-senha-modal" class="hidden modal">
         <div class="modal-content">
             <h3 class="text-xl font-bold mb-4">Recuperar Senha</h3>
@@ -294,28 +306,34 @@
         </div>
     </div>
 
+    <!-- MODAL: Lista de Comprados/Reservados -->
     <div id="lista-compras-modal" class="hidden modal">
         <div class="modal-content max-w-2xl">
             <h3 class="text-xl font-bold mb-4">Itens Comprados/Reservados</h3>
-            <div id="lista-compras-conteudo" class="max-h-[60vh] overflow-y-auto mb-4 space-y-2"></div>
+            <div id="lista-compras-conteudo" class="max-h-[60vh] overflow-y-auto mb-4 space-y-2">
+                <!-- Conteúdo gerado pelo JS -->
+            </div>
             <button onclick="closeModal('lista-compras-modal')" class="w-full bg-gray-200 hover:bg-gray-300 py-2 rounded-lg">Fechar</button>
         </div>
     </div>
 
+    <!-- MODAL: Logs do Sistema -->
     <div id="logs-modal" class="hidden modal">
         <div class="modal-content max-w-2xl">
             <h3 class="text-xl font-bold mb-4">Registro de Ações</h3>
-            <div id="logs-conteudo" class="max-h-[60vh] overflow-y-auto mb-4 space-y-1 text-sm"></div>
+            <div id="logs-conteudo" class="max-h-[60vh] overflow-y-auto mb-4 space-y-1 text-sm">
+                <!-- Conteúdo gerado pelo JS -->
+            </div>
             <button onclick="closeModal('logs-modal')" class="w-full bg-gray-200 hover:bg-gray-300 py-2 rounded-lg">Fechar</button>
         </div>
     </div>
 
-    <!-- FIREBASE -->
+    <!-- ============================================== FIREBASE ============================================== -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js"></script>
 
-    <!-- CÓDIGO PRINCIPAL -->
+    <!-- SEU CÓDIGO PRINCIPAL -->
     <script src="app.js"></script>
 </body>
 </html>
