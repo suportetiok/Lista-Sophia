@@ -1,7 +1,7 @@
-import { db, auth, providerGoogle, ref, onValue, set, update, push, remove, get, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, sendPasswordResetEmail, signOut, onAuthStateChanged } from './firebase.js';
+import { db, auth, providerGoogle, ref, onValue, set, update, push, remove, get, signInWithEmailAndPassword, signInWithPopup, signOut, onAuthStateChanged } from './firebase.js';
 
-// ✅ SEU UID PRINCIPAL (SEM ELE NINGUÉM CRIA NINGUÉM)
-const UID_MESTRE = "lWScb6ixfRQRNBkPloMdKcGFHzS2";
+// ✅ SEU UID EXATO - NÃO MUDE NADA AQUI
+const MEU_UID = "lWScb6ixfRQRNBkPloMdKcGFHzS2";
 
 // Variáveis Globais
 let isAdmin = false;
@@ -22,7 +22,6 @@ const btnNewItem = document.getElementById('btn-new-item');
 const btnSettings = document.getElementById('btn-settings');
 const btnListaCompras = document.getElementById('btn-lista-compras');
 const btnLogs = document.getElementById('btn-logs');
-const btnAdicionarAdmin = document.getElementById('btn-adicionar-admin'); // NOVO BOTÃO
 
 // Elementos Modais
 const editModal = document.getElementById('edit-modal');
@@ -57,15 +56,6 @@ const cfgWelcomeText = document.getElementById('cfg-welcome-text');
 const cfgBgImage = document.getElementById('cfg-bg-image');
 const cfgFooterText = document.getElementById('cfg-footer-text');
 
-// 🆕 MODAL ADICIONAR ADMIN
-const adminModal = document.getElementById('admin-modal');
-const novoAdminEmail = document.getElementById('novo-admin-email');
-const novoAdminSenha = document.getElementById('novo-admin-senha');
-
-// 🆕 MODAL RECUPERAR SENHA
-const recuperarSenhaModal = document.getElementById('recuperar-senha-modal');
-const emailRecuperacao = document.getElementById('email-recuperacao');
-
 // FUNÇÕES GLOBAIS
 window.closeModal = function(modalId) {
     const modal = document.getElementById(modalId);
@@ -89,23 +79,6 @@ window.hideAdminLogin = function() {
     screenLogin.classList.remove('hidden');
 };
 
-// 🆕 RECUPERAR SENHA
-window.abrirRecuperarSenha = function() {
-    recuperarSenhaModal.classList.remove('hidden');
-};
-
-window.enviarRecuperacao = async function() {
-    const email = emailRecuperacao.value.trim();
-    if(!email) return alert("Digite o e-mail!");
-    try {
-        await sendPasswordResetEmail(auth, email);
-        alert("✅ E-mail de recuperação enviado! Verifique sua caixa de entrada.");
-        closeModal('recuperar-senha-modal');
-    } catch (erro) {
-        alert("❌ Erro: " + erro.message);
-    }
-};
-
 window.handleAdminLogin = async function(event) {
     event.preventDefault();
     const email = document.getElementById('admin-email').value.trim();
@@ -114,17 +87,15 @@ window.handleAdminLogin = async function(event) {
     try {
         const resultado = await signInWithEmailAndPassword(auth, email, senha);
         
-        // ✅ VERIFICA SE É ADMIN NO BANCO
-        const snapAdmin = await get(ref(db, `admins/${resultado.user.uid}`));
-        if (snapAdmin.exists()) {
+        // ✅ VERIFICAÇÃO FORÇADA: SE FOR SEU UID = ADMIN
+        if (resultado.user.uid === MEU_UID) {
             isAdmin = true;
             usuarioAtualNome = "Administrador";
             mostrarBotoesAdmin();
             alert("✅ LOGADO COMO ADMINISTRADOR!");
         } else {
             isAdmin = false;
-            alert("❌ Acesso negado! Você não é administrador.");
-            return;
+            usuarioAtualNome = resultado.user.displayName || "Usuário";
         }
 
         screenAdminLogin.classList.add('hidden');
@@ -134,7 +105,7 @@ window.handleAdminLogin = async function(event) {
         
     } catch (erro) {
         console.error("ERRO LOGIN:", erro);
-        alert("❌ Erro: Verifique e-mail e senha.");
+        alert("❌ Erro: " + erro.message);
     }
 };
 
@@ -142,9 +113,8 @@ window.loginComGoogle = async function() {
     try {
         const resultado = await signInWithPopup(auth, providerGoogle);
 
-        // ✅ VERIFICA SE É ADMIN NO BANCO
-        const snapAdmin = await get(ref(db, `admins/${resultado.user.uid}`));
-        if (snapAdmin.exists()) {
+        // ✅ MESMA REGRA PARA GOOGLE
+        if (resultado.user.uid === MEU_UID) {
             isAdmin = true;
             usuarioAtualNome = resultado.user.displayName || "Administrador";
             mostrarBotoesAdmin();
@@ -178,7 +148,6 @@ window.handleLogin = function(event) {
         btnSettings.classList.add('hidden');
         btnListaCompras.classList.add('hidden');
         btnLogs.classList.add('hidden');
-        btnAdicionarAdmin.classList.add('hidden');
         renderGifts();
     }
 };
@@ -193,7 +162,7 @@ window.handleLogout = async function() {
 };
 
 window.openNewItemModal = function() {
-    if(!editModal || !isAdmin) { alert("❌ Acesso restrito!"); return; }
+    if(!editModal || !isAdmin) { alert("❌ Acesso restrito ao administrador!"); return; }
     document.getElementById('edit-modal-title').textContent = "Adicionar Novo Presente";
     editId.value = "";
     editName.value = "";
@@ -206,7 +175,7 @@ window.openNewItemModal = function() {
 };
 
 window.openEditModal = function(giftId) {
-    if(!isAdmin) { alert("❌ Acesso restrito!"); return; }
+    if(!isAdmin) { alert("❌ Acesso restrito ao administrador!"); return; }
     const gift = giftsData.find(g => g.id === giftId);
     if(gift) {
         document.getElementById('edit-modal-title').textContent = "Editar Presente";
@@ -365,36 +334,6 @@ window.openSettingsModal = function() {
     settingsModal.classList.remove('hidden');
 };
 
-// 🆕 ADICIONAR NOVO ADMIN
-window.abrirAdicionarAdmin = function() {
-    if(!isAdmin || auth.currentUser.uid !== UID_MESTRE) { 
-        alert("❌ Apenas o administrador principal pode cadastrar novos!"); 
-        return; 
-    }
-    adminModal.classList.remove('hidden');
-};
-
-window.cadastrarNovoAdmin = async function(e) {
-    e.preventDefault();
-    const email = novoAdminEmail.value.trim();
-    const senha = novoAdminSenha.value;
-
-    try {
-        // Cria a conta no Firebase Auth
-        const usuarioCriado = await createUserWithEmailAndPassword(auth, email, senha);
-        // Cadastra como ADMIN no banco
-        await set(ref(db, `admins/${usuarioCriado.user.uid}`), true);
-        
-        alert("✅ Novo administrador cadastrado com sucesso!");
-        closeModal('admin-modal');
-        novoAdminEmail.value = "";
-        novoAdminSenha.value = "";
-
-    } catch (erro) {
-        alert("❌ Erro: " + erro.message);
-    }
-};
-
 window.saveItem = async function(e) {
     e.preventDefault();
     if(!isAdmin) return;
@@ -464,7 +403,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if(usuarioAtualNome) atualizarSaudacao();
     });
 
-    // ✅ CARREGA TODOS OS ITENS
+    // ✅ CARREGA TODOS OS ITENS - 100% CORRIGIDO
     onValue(ref(db, 'gifts'), snap => {
         giftsData = [];
         snap.forEach(childSnapshot => {
@@ -487,7 +426,6 @@ function mostrarBotoesAdmin() {
     btnSettings.classList.remove('hidden');
     btnListaCompras.classList.remove('hidden');
     btnLogs.classList.remove('hidden');
-    btnAdicionarAdmin.classList.remove('hidden'); // MOSTRA BOTÃO DE NOVO ADMIN
 }
 
 function registrarLog(tipo, descricao, itemId=null) {
